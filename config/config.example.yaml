@@ -1,0 +1,7 @@
+remote:
+  url: https://chocolatey.org/
+
+local:
+  url: http://localhost/
+  api_key: SERVICE_ACCOUNT_API_KEY
+  package_storage_path: storage/packages/

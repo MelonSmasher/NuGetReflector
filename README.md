@@ -13,8 +13,8 @@ This tool mirrors an NuGet repository to another NuGet server. This can be used 
 * Pip
 
 ```shell
-cp config/config.example.conf config/config.conf;
-vi config/config.conf; # Fill out your settings
+cp config/config.example.yaml config/config.yaml;
+vi config/config.yaml; # Fill out your settings
 pip install -r requirements.txt;
 ```
 

@@ -5,7 +5,15 @@ from MelonSmasher.Reflect import Mirror
 
 def main():
     config = Config()
-    mirror = Mirror(config.remote_url, config.local_url, config.package_storage_path, config.local_api_key)
+    mirror = Mirror(
+        config.remote_url,
+        config.local_url,
+        config.package_storage_path,
+        config.local_api_key,
+        config.hash_verify_downloads,
+        config.hash_verify_uploaded,
+        config.hash_verify_cache
+    )
     mirror.sync_packages()
 
 

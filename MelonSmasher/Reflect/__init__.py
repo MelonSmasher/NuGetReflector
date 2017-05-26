@@ -6,6 +6,7 @@ from requests import put, get
 import os.path
 import sys
 import hashlib
+import base64
 
 NAME_SCHEME_META = '{http://schemas.microsoft.com/ado/2007/08/dataservices/metadata}'
 NAME_SCHEME_DATA = '{http://schemas.microsoft.com/ado/2007/08/dataservices}'
@@ -19,19 +20,26 @@ KEY_SRC = 'src'
 KEY_REL = 'rel'
 KEY_HREF = 'href'
 VALUE_NEXT = 'next'
-XML_SHIMS = [
-    ('&nbsp;', u'\u00a0'),
-    ('&acirc;', u'\u00e2'),
-    ]
+XML_SHIMS = [('&nbsp;', u'\u00a0'), ('&acirc;', u'\u00e2'), ('&amp;', u'\u0026')]
 
 
 class Mirror(object):
-    def __init__(self, remote_url, local_url, package_storage_path, local_api_key):
+    def __init__(self,
+                 remote_url,
+                 local_url,
+                 package_storage_path,
+                 local_api_key,
+                 verify_downloads=True,
+                 verify_uploaded=True,
+                 verify_cache=False
+                 ):
         """
-        :param remote_url: str
-        :param local_url: str
-        :param package_storage_path: str
-        :param local_api_key: str
+        :param remote_url: 
+        :param local_url: 
+        :param package_storage_path: 
+        :param local_api_key: 
+        :param verify_downloads: 
+        :param verify_cache: 
         """
         self.remote_api_url = '/'.join([remote_url, 'api/v2'])
         self.remote_packages_url = '/'.join([self.remote_api_url, 'Packages'])
@@ -40,6 +48,71 @@ class Mirror(object):
         self.local_packages_url = '/'.join([self.local_api_url, 'Packages'])
         self.package_storage_path = package_storage_path
         self.local_api_key = local_api_key
+        self.verify_downloads = verify_downloads
+        self.verify_uploaded = verify_uploaded
+        self.verify_cache = verify_cache
+
+    @staticmethod
+    def hash_bytestr_iter(bytesiter, hasher, ashexstr=False):
+        for block in bytesiter:
+            hasher.update(block)
+        return hasher.hexdigest() if ashexstr else hasher.digest()
+
+    @staticmethod
+    def file_as_blockiter(file, blocksize=65536):
+        with file:
+            block = file.read(blocksize)
+            while len(block) > 0:
+                yield block
+                block = file.read(blocksize)
+
+    def sha512sum(self, file_path, blocksize=65536):
+        """
+        :param file_path: 
+        :param blocksize: 
+        :return: 
+        """
+        return base64.encodestring(
+            self.hash_bytestr_iter(self.file_as_blockiter(open(file_path, 'rb')), hashlib.sha512(), False)).replace(
+            "\n", '')
+
+    def sha256sum(self, file_path, blocksize=65536):
+        """
+        :param file_path: 
+        :param blocksize: 
+        :return: 
+        """
+        return base64.encodestring(
+            self.hash_bytestr_iter(self.file_as_blockiter(open(file_path, 'rb')), hashlib.sha256(), False)).replace(
+            "\n", '')
+
+    @staticmethod
+    def hashes_match(hash_1, hash_2):
+        """
+        :param hash_1: 
+        :param hash_2: 
+        :return: 
+        """
+        if str(hash_1) == str(hash_2):
+            print(' Pass!')
+            return True
+        else:
+            print(' Fail!')
+            print('Hash 1: ' + hash_1)
+            print('Hash 2: ' + hash_2)
+            return False
+
+    def verify_package_hash(self, file_path, target_hash, message='Verifying package hash...'):
+        """
+        :param file_path: 
+        :param target_hash: 
+        :param message: 
+        :return: 
+        """
+        sys.stdout.write(message)
+        sys.stdout.flush()
+        local_hash = self.sha512sum(file_path)
+        return self.hashes_match(local_hash, target_hash)
 
     @staticmethod
     def _get(url):
@@ -60,25 +133,25 @@ class Mirror(object):
 
     def local_package(self, title, version):
         """
-        :param title: str
-        :param version: str
-        :return: objectify.ObjectifiedElement | bool
+        :param title: 
+        :param version: 
+        :return: 
         """
         url = ''.join([self.local_packages_url, '(Id=\'', title, '\',Version=\'', version, '\')'])
         return self._get(url)
 
     def remote_package(self, title, version):
         """
-        :param title: str
-        :param version: str
-        :return: objectify.ObjectifiedElement | bool
+        :param title: 
+        :param version: 
+        :return: 
         """
         url = ''.join([self.remote_packages_url, '(Id=\'', title, '\',Version=\'', version, '\')'])
         return self._get(url)
 
     def local_packages(self, url=None):
         """
-        :param url: str 
+        :param url: 
         :return: 
         """
         if url is None: url = self.local_packages_url
@@ -86,20 +159,22 @@ class Mirror(object):
 
     def remote_packages(self, url=None):
         """
-        :param url: str
+        :param url: 
         :return: 
         """
         if url is None: url = self.remote_packages_url
         return self._get(url)
 
-    @staticmethod
-    def _download_package(content_url, local_path):
+    def _download_package(self, content_url, local_path, remote_hash=None, reties=0, force=False):
         """
         :param content_url: 
         :param local_path: 
+        :param remote_hash: 
+        :param reties: 
+        :param force: 
         :return: 
         """
-        if not os.path.isfile(local_path):
+        if not os.path.isfile(local_path) or force:
             count = 0
             sys.stdout.write('Downloading package.')
             sys.stdout.flush()
@@ -118,12 +193,28 @@ class Mirror(object):
                         f.write(chunk)
                         f.flush()
             print('')
-            if os.path.isfile(local_path):
-                return {'file_exists': True, 'message': 'Package cached!'}
+
+        if os.path.isfile(local_path):
+            if not remote_hash is None:
+                hash_verified = self.verify_package_hash(local_path, remote_hash)
+                if not hash_verified and reties < 3:
+                    # Retry loop
+                    reties += 1
+                    print('Hashes do not match retrying download...')
+                    return self._download_package(content_url, local_path, remote_hash, reties, True)
+                elif not hash_verified and reties >= 3:
+                    # Reached max retries
+                    print('Retried to download the package 3 times, moving on... :-(')
+                    return False
+                else:
+                    # Hash verified
+                    return True
             else:
-                return {'file_exists': False, 'message': 'Problem caching package!'}
+                # Skipping hash verification
+                return True
         else:
-            return {'file_exists': True, 'message': 'Package already cached...'}
+            # File did not exists after DL
+            return False
 
     def _upload_package(self, local_path, title, version):
         """
@@ -135,22 +226,40 @@ class Mirror(object):
         local_response = self.local_package(title, version)
         if local_response.status_code == 404:
             print('Uploading package...')
-
             f = open(local_path, mode='rb')
             files = {'package': ('package', f, 'application/octet-stream')}
             headers = {'X-NuGet-ApiKey': self.local_api_key}
             put_result = put(self.local_api_upload_url, files=files, headers=headers)
-
-            print(''.join(['Response Code: ', str(put_result.status_code)]))
-            if put_result.status_code == 200:
-                return {'success': True, 'message': 'Package mirrored!', 'response': put_result}
-            else:
-                return {'success': False, 'message': 'Failed to mirror package!', 'response': put_result}
+            print(''.join(['Upload response Code: ', str(put_result.status_code)]))
+            upload_status = {
+                'response': put_result,
+                'mirrored': True,
+                'uploaded': True
+            }
         elif local_response.status_code == 200:
-            return {'success': True, 'message': 'Package already mirrored...'}
+            print('Package already mirrored...')
+            upload_status = {
+                'response': local_response,
+                'mirrored': True,
+                'uploaded': False,
+                'server_hash': local_response.objectified[KEY_PROPERTIES][KEY_HASH]
+            }
         else:
-            return {'success': False,
-                    'message': ''.join(['Local API returned HTTP code: ', str(local_response.status_code)])}
+            return {
+                'response': local_response,
+                'mirrored': False,
+                'uploaded': False,
+                'server_hash': False
+            }
+
+        if not 'server_hash' in upload_status and self.verify_uploaded:
+            r = self.local_package(title, version)
+            if r.status_code == 200:
+                upload_status['server_hash'] = r.objectified[KEY_PROPERTIES][KEY_HASH]
+            else:
+                upload_status['server_hash'] = False
+
+        return upload_status
 
     def sync_packages(self):
         """        
@@ -174,18 +283,44 @@ class Mirror(object):
                         package_name = '.'.join([title, version])
                         content_url = package[KEY_CONTENT].get(KEY_SRC)
                         local_path = os.path.join(self.package_storage_path, '.'.join([package_name, 'nupkg']))
+                        remote_hash = str(package[KEY_PROPERTIES][KEY_HASH]) if self.verify_downloads else None
+                        dl_status = False
 
                         # Begin package sync
                         print('')
                         print(''.join(['########## ', package_name, ' ##########']))
-                        dl_status = self._download_package(content_url, local_path)
-                        print(dl_status['message'])
-                        if dl_status['file_exists']:
+
+                        if not os.path.isfile(local_path):
+                            dl_status = self._download_package(content_url, local_path, remote_hash)
+                        else:
+                            if self.verify_cache:
+                                if not self.verify_package_hash(local_path, remote_hash):
+                                    dl_status = self._download_package(content_url, remote_hash, True)
+                                else:
+                                    dl_status = True
+
+                        if dl_status:
                             up_status = self._upload_package(local_path, title, version)
-                            if response in up_status:
-                                print(''.join(['Response Body: ', up_status['response'].text]))
+                            if up_status['mirrored']:
+                                if self.verify_uploaded and up_status['server_hash']:
+                                    sys.stdout.write('Verifying server hashes...')
+                                    sys.stdout.flush()
+                                    server_hashes_verified = self.hashes_match(remote_hash, up_status['server_hash'])
+                                    if self.verify_cache and up_status['server_hash']:
+                                        local_hashes_verified = self.verify_package_hash(local_path,
+                                                                                         up_status['server_hash'],
+                                                                                         'Verifying cache hash against mirror...')
+
+                                if up_status['uploaded']:
+                                    print('Package uploaded!')
+                                    print(''.join(['Response Body: ', up_status['response'].text]))
+
+                                if not up_status['uploaded']:
+                                    print('Package already uploaded!')
                             else:
-                                print(''.join(['Message: ', up_status['message']]))
+                                print(''.join(['Response Body: ', up_status['response'].text]))
+                                print('Package not mirrored!')
+
                         print('')
 
                 # Get the last link on the page

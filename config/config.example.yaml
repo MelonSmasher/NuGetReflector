@@ -5,3 +5,8 @@ local:
   url: http://localhost/
   api_key: SERVICE_ACCOUNT_API_KEY
   package_storage_path: storage/packages/
+
+hash:
+  verify_downloads: true
+  verify_uploaded: true
+  verify_cache: false # Will reduce performance

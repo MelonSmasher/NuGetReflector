@@ -20,7 +20,8 @@ KEY_SRC = 'src'
 KEY_REL = 'rel'
 KEY_HREF = 'href'
 VALUE_NEXT = 'next'
-XML_SHIMS = [('&nbsp;', u'\u00a0'), ('&acirc;', u'\u00e2'), ('&amp;', u'\u0026')]
+# ('&nbsp;', u'\u00a0'), ('&acirc;', u'\u00e2'), ('&amp;', u'\u0026')
+XML_SHIMS = []
 
 
 class Mirror(object):
@@ -216,15 +217,16 @@ class Mirror(object):
             # File did not exists after DL
             return False
 
-    def _upload_package(self, local_path, title, version):
+    def _upload_package(self, local_path, title, version, force=False):
         """
         :param local_path: 
         :param title: 
         :param version: 
+        :param force: 
         :return: 
         """
         local_response = self.local_package(title, version)
-        if local_response.status_code == 404:
+        if local_response.status_code == 404 or force:
             print('Uploading package...')
             f = open(local_path, mode='rb')
             files = {'package': ('package', f, 'application/octet-stream')}
@@ -295,7 +297,8 @@ class Mirror(object):
                         else:
                             if self.verify_cache:
                                 if not self.verify_package_hash(local_path, remote_hash):
-                                    dl_status = self._download_package(content_url, remote_hash, True)
+                                    os.remove(local_path)
+                                    dl_status = self._download_package(content_url, local_path, remote_hash, True)
                                 else:
                                     dl_status = True
 
@@ -305,7 +308,10 @@ class Mirror(object):
                                 if self.verify_uploaded and up_status['server_hash']:
                                     sys.stdout.write('Verifying server hashes...')
                                     sys.stdout.flush()
-                                    server_hashes_verified = self.hashes_match(remote_hash, up_status['server_hash'])
+                                    if not self.hashes_match(remote_hash, up_status['server_hash']):
+                                        print('Server and mirror have a mis-match re-uploading...')
+                                        up_status = self._upload_package(local_path, title, version, True)
+
                                     if self.verify_cache and up_status['server_hash']:
                                         local_hashes_verified = self.verify_package_hash(local_path,
                                                                                          up_status['server_hash'],

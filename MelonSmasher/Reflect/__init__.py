@@ -5,17 +5,24 @@ from time import sleep
 from requests import put, get
 import os.path
 import sys
+import hashlib
 
 NAME_SCHEME_META = '{http://schemas.microsoft.com/ado/2007/08/dataservices/metadata}'
 NAME_SCHEME_DATA = '{http://schemas.microsoft.com/ado/2007/08/dataservices}'
 KEY_PROPERTIES = ''.join([NAME_SCHEME_META, 'properties'])
 KEY_VERSION = ''.join([NAME_SCHEME_DATA, 'Version'])
+KEY_HASH = ''.join([NAME_SCHEME_DATA, 'PackageHash'])
+KEY_ALGORITHM = ''.join([NAME_SCHEME_DATA, 'PackageHashAlgorithm'])
 KEY_TITLE = 'title'
 KEY_CONTENT = 'content'
 KEY_SRC = 'src'
 KEY_REL = 'rel'
 KEY_HREF = 'href'
 VALUE_NEXT = 'next'
+XML_SHIMS = [
+    ('&nbsp;', u'\u00a0'),
+    ('&acirc;', u'\u00e2'),
+    ]
 
 
 class Mirror(object):
@@ -42,7 +49,11 @@ class Mirror(object):
         """
         response = get(url)
         if response.status_code == 200:
-            response.objectified = objectify.fromstring(response.content)
+            xml = response.content
+            # pre process XML to remove bogus xml
+            for before, after in XML_SHIMS:
+                xml = xml.replace(before, after.encode('utf8'))
+            response.objectified = objectify.fromstring(xml)
             return response
         else:
             return response

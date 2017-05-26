@@ -1,5 +1,6 @@
 from __future__ import print_function
 from yaml import load
+from os.path import isfile
 
 
 class Config(object):
@@ -13,3 +14,6 @@ class Config(object):
             self.hash_verify_downloads = c['hash']['verify_downloads']
             self.hash_verify_uploaded = c['hash']['verify_uploaded']
             self.hash_verify_cache = c['hash']['verify_cache']
+            self.dotnet_path = c['local']['dotnet_path']
+            if not self.dotnet_path or not isfile(self.dotnet_path):
+                raise EnvironmentError('DotNot CLI executable is not configured or the path specified does not exist!')

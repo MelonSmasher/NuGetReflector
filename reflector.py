@@ -10,9 +10,10 @@ def main():
         config.local_url,
         config.package_storage_path,
         config.local_api_key,
+        config.dotnet_path,
         config.hash_verify_downloads,
         config.hash_verify_uploaded,
-        config.hash_verify_cache
+        config.hash_verify_cache,
     )
     mirror.sync_packages()
 

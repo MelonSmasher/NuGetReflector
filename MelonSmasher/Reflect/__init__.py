@@ -3,6 +3,7 @@ from __future__ import print_function
 from lxml import objectify
 from time import sleep
 from requests import put, get
+from subprocess import call
 import os.path
 import sys
 import hashlib
@@ -20,8 +21,6 @@ KEY_SRC = 'src'
 KEY_REL = 'rel'
 KEY_HREF = 'href'
 VALUE_NEXT = 'next'
-# ('&nbsp;', u'\u00a0'), ('&acirc;', u'\u00e2'), ('&amp;', u'\u0026')
-XML_SHIMS = []
 
 
 class Mirror(object):
@@ -30,6 +29,7 @@ class Mirror(object):
                  local_url,
                  package_storage_path,
                  local_api_key,
+                 dotnet_path,
                  verify_downloads=True,
                  verify_uploaded=True,
                  verify_cache=False
@@ -39,7 +39,9 @@ class Mirror(object):
         :param local_url: 
         :param package_storage_path: 
         :param local_api_key: 
+        :param dotnet_path: 
         :param verify_downloads: 
+        :param verify_uploaded: 
         :param verify_cache: 
         """
         self.remote_api_url = '/'.join([remote_url, 'api/v2'])
@@ -49,6 +51,7 @@ class Mirror(object):
         self.local_packages_url = '/'.join([self.local_api_url, 'Packages'])
         self.package_storage_path = package_storage_path
         self.local_api_key = local_api_key
+        self.dotnet_path = dotnet_path
         self.verify_downloads = verify_downloads
         self.verify_uploaded = verify_uploaded
         self.verify_cache = verify_cache
@@ -124,11 +127,12 @@ class Mirror(object):
         response = get(url)
         if response.status_code == 200:
             xml = response.content
-            # pre process XML to remove bogus xml
-            for before, after in XML_SHIMS:
-                xml = xml.replace(before, after.encode('utf8'))
-            response.objectified = objectify.fromstring(xml)
-            return response
+            try:
+                response.objectified = objectify.fromstring(xml)
+                return response
+            except Exception as e:
+                print(e.message)
+                return False
         else:
             return response
 
@@ -228,13 +232,11 @@ class Mirror(object):
         local_response = self.local_package(title, version)
         if local_response.status_code == 404 or force:
             print('Uploading package...')
-            f = open(local_path, mode='rb')
-            files = {'package': ('package', f, 'application/octet-stream')}
-            headers = {'X-NuGet-ApiKey': self.local_api_key}
-            put_result = put(self.local_api_upload_url, files=files, headers=headers)
-            print(''.join(['Upload response Code: ', str(put_result.status_code)]))
+            cmd = ' '.join([self.dotnet_path, 'nuget', 'push', local_path, '-s', self.local_api_upload_url, '-k',
+                            self.local_api_key])
+            return_code = call(cmd, shell=True)
             upload_status = {
-                'response': put_result,
+                'response': return_code,
                 'mirrored': True,
                 'uploaded': True
             }
@@ -263,6 +265,70 @@ class Mirror(object):
 
         return upload_status
 
+    def sync_and_verify_package(self, package, retry=0):
+        """
+        :param package: 
+        :return: 
+        """
+        # Extract the info that we need from the entry
+        title = str(package[KEY_TITLE])
+        version = str(package[KEY_PROPERTIES][KEY_VERSION])
+        package_name = '.'.join([title, version])
+        content_url = package[KEY_CONTENT].get(KEY_SRC)
+        local_path = os.path.join(self.package_storage_path, '.'.join([package_name, 'nupkg']))
+        remote_hash = str(package[KEY_PROPERTIES][KEY_HASH]) if self.verify_downloads else None
+        dl_status = False
+        up_status = {}
+
+        # Begin package sync
+        print('')
+        print(''.join(['########## ', package_name, ' ##########']))
+
+        if not os.path.isfile(local_path):
+            dl_status = self._download_package(content_url, local_path, remote_hash)
+        else:
+            if self.verify_cache:
+                if not self.verify_package_hash(local_path, remote_hash):
+                    os.remove(local_path)
+                    dl_status = self._download_package(content_url, local_path, remote_hash, True)
+                else:
+                    dl_status = True
+
+        if dl_status:
+            up_status = self._upload_package(local_path, title, version)
+            if up_status['mirrored']:
+                if self.verify_uploaded and up_status['server_hash']:
+                    sys.stdout.write('Verifying server hashes...')
+                    sys.stdout.flush()
+                    if not self.hashes_match(remote_hash, up_status['server_hash']):
+                        print('Mirror and repo hashes do not match! Re-uploading...')
+                        up_status = self._upload_package(local_path, title, version, True)
+                        if not self.hashes_match(remote_hash, up_status['server_hash']):
+                            if retry < 3:
+                                retry += 1
+                                up_status = self.sync_and_verify_package(package, retry)
+                            else:
+                                print('Max sync retries reached! Moving on...')
+                                return up_status
+
+                if up_status['uploaded']:
+                    print('Package uploaded!')
+
+                if not up_status['uploaded']:
+                    print('Package already uploaded!')
+            else:
+                # print(''.join(['Response Body: ', up_status['response'].text]))
+                print('Package not mirrored!')
+        else:
+            up_status = {
+                'response': None,
+                'mirrored': False,
+                'uploaded': False,
+                'server_hash': False
+            }
+        print('')
+        return up_status
+
     def sync_packages(self):
         """        
         :return: 
@@ -278,57 +344,7 @@ class Mirror(object):
                 # Whats the size of the entry list
                 if len(page.entry) > 0:
                     for package in page.entry:
-
-                        # Extract the info that we need from the entry
-                        title = str(package[KEY_TITLE])
-                        version = str(package[KEY_PROPERTIES][KEY_VERSION])
-                        package_name = '.'.join([title, version])
-                        content_url = package[KEY_CONTENT].get(KEY_SRC)
-                        local_path = os.path.join(self.package_storage_path, '.'.join([package_name, 'nupkg']))
-                        remote_hash = str(package[KEY_PROPERTIES][KEY_HASH]) if self.verify_downloads else None
-                        dl_status = False
-
-                        # Begin package sync
-                        print('')
-                        print(''.join(['########## ', package_name, ' ##########']))
-
-                        if not os.path.isfile(local_path):
-                            dl_status = self._download_package(content_url, local_path, remote_hash)
-                        else:
-                            if self.verify_cache:
-                                if not self.verify_package_hash(local_path, remote_hash):
-                                    os.remove(local_path)
-                                    dl_status = self._download_package(content_url, local_path, remote_hash, True)
-                                else:
-                                    dl_status = True
-
-                        if dl_status:
-                            up_status = self._upload_package(local_path, title, version)
-                            if up_status['mirrored']:
-                                if self.verify_uploaded and up_status['server_hash']:
-                                    sys.stdout.write('Verifying server hashes...')
-                                    sys.stdout.flush()
-                                    if not self.hashes_match(remote_hash, up_status['server_hash']):
-                                        print('Server and mirror have a mis-match re-uploading...')
-                                        up_status = self._upload_package(local_path, title, version, True)
-
-                                    if self.verify_cache and up_status['server_hash']:
-                                        local_hashes_verified = self.verify_package_hash(local_path,
-                                                                                         up_status['server_hash'],
-                                                                                         'Verifying cache hash against mirror...')
-
-                                if up_status['uploaded']:
-                                    print('Package uploaded!')
-                                    print(''.join(['Response Body: ', up_status['response'].text]))
-
-                                if not up_status['uploaded']:
-                                    print('Package already uploaded!')
-                            else:
-                                print(''.join(['Response Body: ', up_status['response'].text]))
-                                print('Package not mirrored!')
-
-                        print('')
-
+                        self.sync_and_verify_package(package)
                 # Get the last link on the page
                 link = page.link[0] if 0 > (len(page.link) - 1) else page.link[(len(page.link) - 1)]
                 # If the last link is the next link set it's url as the target url for the next iteration

@@ -3,8 +3,9 @@ remote:
 
 local:
   url: http://localhost/
-  api_key: SERVICE_ACCOUNT_API_KEY
+  api_key: null # Fill this in
   package_storage_path: storage/packages/
+  dotnet_path: false # Example: /usr/local/share/dotnet/dotnet
 
 hash:
   verify_downloads: true

@@ -127,7 +127,8 @@ class Mirror(object):
         :param force: 
         :return: 
         """
-        local_response = pull_package(package_id, version, self.local_packages_url)
+        use_local_json = self.local_json_api
+        local_response = pull_package(package_id, version, self.local_packages_url, use_local_json)
         if local_response.status_code == 404 or force:
             print('Uploading package...')
             cmd = ' '.join([self.dotnet_path, 'nuget', 'push', local_path, '-s', self.local_api_upload_url, '-k',
@@ -140,26 +141,48 @@ class Mirror(object):
             }
         elif local_response.status_code == 200:
             print('Package already mirrored...')
+
+            if use_local_json:
+                data = local_response.json()['d']
+                server_hash = data['PackageHash']
+                hash_method = data['PackageHashAlgorithm']
+            else:
+                server_hash = local_response.objectified[KEY_PROPERTIES][KEY_HASH]
+                hash_method = local_response.objectified[KEY_PROPERTIES][KEY_ALGORITHM]
+
             upload_status = {
                 'response': local_response,
                 'mirrored': True,
                 'uploaded': False,
-                'server_hash': local_response.objectified[KEY_PROPERTIES][KEY_HASH]
+                'server_hash': server_hash,
+                'server_hash_method': hash_method
             }
         else:
             return {
                 'response': local_response,
                 'mirrored': False,
                 'uploaded': False,
-                'server_hash': False
+                'server_hash': False,
+                'server_hash_method': False
             }
 
         if 'server_hash' not in upload_status and self.verify_uploaded:
-            r = pull_package(package_id, version, self.local_packages_url)
+            r = pull_package(package_id, version, self.local_packages_url, use_local_json)
             if r.status_code == 200:
-                upload_status['server_hash'] = r.objectified[KEY_PROPERTIES][KEY_HASH]
+
+                if use_local_json:
+                    data = r.json()['d']
+                    server_hash = data['PackageHash']
+                    hash_method = data['PackageHashAlgorithm']
+                else:
+                    server_hash = r.objectified[KEY_PROPERTIES][KEY_HASH]
+                    hash_method = r.objectified[KEY_PROPERTIES][KEY_ALGORITHM]
+
+                upload_status['server_hash'] = server_hash
+                upload_status['server_hash_method'] = hash_method
             else:
                 upload_status['server_hash'] = False
+                upload_status['server_hash_method'] = False
 
         return upload_status
 
@@ -235,7 +258,7 @@ class Mirror(object):
                 if not up_status['uploaded']:
                     print('Package already uploaded!')
             else:
-                # print(''.join(['Response Body: ', up_status['response'].text]))
+                # print(''.join(['Response Body: ', up_status['response'].text])) # @todo might want this for debug
                 print('Package not mirrored!')
         else:
             up_status = {
@@ -271,7 +294,7 @@ class Mirror(object):
                         # sync it!
                         self.sync_and_verify_package(package)
 
-                    #done = True  # @todo this is temporary
+                    # done = True  # @todo this is temporary
 
                     # If we have a next key continue to the next page
                     if VALUE_NEXT['json'] in data:

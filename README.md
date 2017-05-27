@@ -50,19 +50,21 @@ pip install -r requirements.txt;
 
 # Config options:
 
-- remote:
-   - url: # remote repo to mirror # Default: https://chocolatey.org/
+- `remote:`
+   - `url:` - remote repo to mirror # Default: https://chocolatey.org/
+   - `json_api:` - request json from remote API # Default false
 
-- local:
-  - url: # local repo to host mirror # Default: http://localhost/
-  - api_key: # local repo api key # Default: null
-  - package_storage_path: # Local path to store packages # Default: storage/packages/
-  - dotnet_path: # Path to dontnet executable # Default: false # Example: /usr/local/share/dotnet/dotnet
+- `local:`
+  - `url:` - local repo to host mirror # Default: http://localhost/
+  - `json_api:` - request json from local API # Default false
+  - `api_key:` - local repo api key # Default: null
+  - `package_storage_path:` - Local path to store packages # Default: storage/packages/
+  - `dotnet_path:` - Path to dontnet executable # Default: false # Example: /usr/local/share/dotnet/dotnet
 
-- hash:
-  - verify_downloads: # Verify downloaded package hash. You should leave this enabled # Default: true
-  - verify_uploaded: # Verify package hash after it has been uploaded to the mirror. You should leave this enabled # Default: true
-  - verify_cache: # Re-verify previously downloaded package hashes. This is usually not needed and can reduce performance # Default: false
+- `hash:`
+  - `verify_downloads:` - Verify downloaded package hash. You should leave this enabled # Default: true
+  - `verify_uploaded:` - Verify package hash after it has been uploaded to the mirror. You should leave this enabled # Default: true
+  - `verify_cache:` - Re-verify previously downloaded package hashes. This is usually not needed and can reduce performance # Default: false
 
 # Usage:
 

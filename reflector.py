@@ -7,7 +7,9 @@ def main():
     config = Config()
     mirror = Mirror(
         config.remote_url,
+        config.remote_json_api,
         config.local_url,
+        config.local_json_api,
         config.package_storage_path,
         config.local_api_key,
         config.dotnet_path,

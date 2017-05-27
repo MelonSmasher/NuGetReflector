@@ -8,7 +8,9 @@ class Config(object):
         with open('config/config.yaml') as data_file:
             c = load(data_file)
             self.remote_url = c['remote']['url'].rstrip('/')
+            self.remote_json_api = c['remote']['json_api']
             self.local_url = c['local']['url'].rstrip('/')
+            self.local_json_api = c['local']['json_api']
             self.local_api_key = c['local']['api_key']
             self.package_storage_path = c['local']['package_storage_path'].rstrip('/').rstrip('\\')
             self.hash_verify_downloads = c['hash']['verify_downloads']

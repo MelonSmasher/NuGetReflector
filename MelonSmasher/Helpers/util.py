@@ -12,7 +12,8 @@ def _pull(url, json=False):
     :return: 
     """
     if json:
-        return get(url, headers={'Accept': 'application/json'})
+        headers = {'Accept': 'application/json'}
+        return get(url, headers=headers)
     else:
         response = get(url)
         if response.status_code == 200:
@@ -35,7 +36,7 @@ def pull_package(title, version, url, json=False):
     :param json: 
     :return: 
     """
-    return _pull(''.join([url, '(Id=\'', title, '\',Version=\'', version, '\')']), json)
+    return _pull(''.join([url, '(Id=\'', title, '\',Version=\'', version, '\')']), json=json)
 
 
 def pull_packages(url, json=False):
@@ -44,7 +45,7 @@ def pull_packages(url, json=False):
     :param json: 
     :return: 
     """
-    return _pull(url, json)
+    return _pull(url, json=json)
 
 
 def sha512sum(file_path, block_size=65536):

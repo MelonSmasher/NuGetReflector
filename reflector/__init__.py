@@ -147,7 +147,7 @@ class Mirror(object):
         """
         use_local_json = self.local_json_api
         local_response = pull_package(package_id, version, self.local_packages_url, use_local_json)
-        if local_response.status_code == 404 or force:
+        if local_response and (local_response.status_code == 404 or force):
             print('Uploading package...')
             cmd = ' '.join([self.dotnet_path, 'nuget', 'push', local_path, '-s', self.local_api_upload_url, '-k',
                             self.local_api_key])
@@ -157,7 +157,7 @@ class Mirror(object):
                 'mirrored': True,
                 'uploaded': True
             }
-        elif local_response.status_code == 200:
+        elif local_response and local_response.status_code == 200:
             print('Package already mirrored...')
 
             if use_local_json:

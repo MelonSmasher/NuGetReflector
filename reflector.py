@@ -1,6 +1,5 @@
 from __future__ import print_function
-from MelonSmasher.Helpers import Config
-from MelonSmasher.Reflect import Mirror
+from reflector import Mirror, Config
 
 
 def main():

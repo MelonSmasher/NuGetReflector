@@ -3,6 +3,7 @@
 config/config.yaml
 storage/packages/*.nupkg
 storage/log/*.log
+storage/sync.delta
 
 ### macOS template
 *.DS_Store

@@ -96,7 +96,9 @@ class Mirror(object):
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
         # What did the target api return
-        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(save_to):
+        if pull_request and (
+                        pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(
+                save_to)):
             # Download the file if we are forcing or it was not already uploaded or cached
             if pull_request.status_code == 404 or not isfile(save_to) or force_dl:
                 if not download_file(content_url, save_to):
@@ -135,7 +137,7 @@ class Mirror(object):
             return False
 
         # Made it here? Cache hash either verified or skipped verification
-        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_up:
+        if pull_request and (pull_request.status_code == 404 or pull_request.status_code == 200 or force_up):
             if pull_request.status_code == 404 or force_up:
                 # Send the package up
                 push_package(self.dotnet_path, save_to, self.local_api_upload_url, self.local_api_key)
@@ -151,7 +153,7 @@ class Mirror(object):
             # Pull the package after uploading it
             pull_request = pull_package(package_name, version, self.local_packages_url, use_target_json)
             # Did we find the package
-            if pull_request.status_code == 200:
+            if pull_request and pull_request.status_code == 200:
                 # Get the hash
                 if use_target_json:
                     # If we are using a json api get it this way
@@ -184,7 +186,7 @@ class Mirror(object):
                 )
 
             elif up_retries >= 3:
-                print ('Max upload retries reached. Skipping :-( ')
+                print('Max upload retries reached. Skipping :-( ')
                 print(''.join(['API error! Code: ', str(pull_request.status_code)]))
                 return False
 

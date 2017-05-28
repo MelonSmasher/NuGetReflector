@@ -1,7 +1,5 @@
 from __future__ import print_function
-
-import os.path
-from subprocess import call
+from os.path import isfile
 from time import sleep
 from yaml import load
 from reflector.util import *
@@ -12,7 +10,7 @@ KEY_PROPERTIES = ''.join([NAME_SCHEME_META, 'properties'])
 KEY_VERSION = ''.join([NAME_SCHEME_DATA, 'Version'])
 KEY_HASH = ''.join([NAME_SCHEME_DATA, 'PackageHash'])
 KEY_ALGORITHM = ''.join([NAME_SCHEME_DATA, 'PackageHashAlgorithm'])
-KEY_TITLE = 'Id'
+KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'
 KEY_SRC = 'src'
 KEY_REL = 'rel'
@@ -32,7 +30,6 @@ class Config(object):
             self.package_storage_path = c['local']['package_storage_path'].rstrip('/').rstrip('\\')
             self.hash_verify_downloads = c['hash']['verify_downloads']
             self.hash_verify_uploaded = c['hash']['verify_uploaded']
-            self.hash_verify_cache = c['hash']['verify_cache']
             self.dotnet_path = c['local']['dotnet_path']
             if not self.dotnet_path or not os.path.isfile(self.dotnet_path):
                 raise EnvironmentError('DotNot CLI executable is not configured or the path specified does not exist!')
@@ -48,8 +45,7 @@ class Mirror(object):
                  local_api_key,
                  dotnet_path,
                  verify_downloads=True,
-                 verify_uploaded=True,
-                 verify_cache=False
+                 verify_uploaded=True
                  ):
         """
         :param remote_url: 
@@ -61,7 +57,6 @@ class Mirror(object):
         :param dotnet_path: 
         :param verify_downloads: 
         :param verify_uploaded: 
-        :param verify_cache: 
         """
         self.remote_api_url = '/'.join([remote_url, 'api/v2'])
         self.remote_json_api = remote_json_api
@@ -75,218 +70,162 @@ class Mirror(object):
         self.dotnet_path = dotnet_path
         self.verify_downloads = verify_downloads
         self.verify_uploaded = verify_uploaded
-        self.verify_cache = verify_cache
 
-    def __download_package(self, content_url, local_path, remote_hash=None, remote_hash_method=None, reties=0,
-                           force=False):
+    def __sync(self, content_url, save_to, package_name, version,
+               source_hash=None,
+               source_hash_method=None,
+               dl_reties=0,
+               up_retries=0,
+               force_dl=False,
+               force_up=False
+               ):
         """
         :param content_url: 
-        :param local_path: 
-        :param remote_hash: 
-        :param reties: 
-        :param force: 
-        :param remote_hash_method: 
+        :param save_to: 
+        :param package_name: 
+        :param version: 
+        :param source_hash: 
+        :param source_hash_method: 
+        :param dl_reties:
+        :param up_retries:
+        :param force_dl:
+        :param force_up: 
         :return: 
         """
-        if not os.path.isfile(local_path) or force:
-            count = 0
-            sys.stdout.write('Downloading package.')
-            sys.stdout.flush()
-            # Get the file and stream it to the disk
-            r = get(content_url, stream=True)
-            with open(local_path, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024):
-                    if chunk:
-                        # Count the chunks
-                        count = count + 1
-                        if count >= 10000:
-                            # Write a dot every 10000 chunks
-                            sys.stdout.write('.')
-                            sys.stdout.flush()
-                        # Write to the file when the chunk gets to 1024
-                        f.write(chunk)
-                        f.flush()
-            print('')
+        # Is the package already uploaded? Pull it from the target API
+        pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
-        if os.path.isfile(local_path):
-            if remote_hash is not None:
-                hash_verified = verify_hash(local_path, remote_hash, hash_method=remote_hash_method)
-                if not hash_verified and reties < 3:
-                    # Retry loop
-                    reties += 1
-                    print('Hashes do not match retrying download...')
-                    return self.__download_package(
-                        content_url,
-                        local_path,
-                        remote_hash=remote_hash,
-                        remote_hash_method=remote_hash_method,
-                        reties=reties,
-                        force=True
-                    )
-                elif not hash_verified and reties >= 3:
-                    # Reached max retries
-                    print('Retried to download the package 3 times, moving on... :-(')
+        # What did the target api return
+        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(save_to):
+            # Download the file if we are forcing or it was not already uploaded or cached
+            if pull_request.status_code == 404 or not isfile(save_to) or force_dl:
+                if not download_file(content_url, save_to):
+                    print('Package does not exists after download!?!')
                     return False
-                else:
-                    # Hash verified
-                    return True
+
+            # Did we get a source hash when this was called
+            if source_hash is not None and self.verify_downloads:
+                # Verify the cached package hash
+                hash_verified = verify_hash(save_to, source_hash, hash_method=source_hash_method)
+                # If the hash is not verified and we have retired less than 3 times
+                if not hash_verified and dl_reties < 3:
+                    # Count a retry
+                    dl_reties += 1
+                    print('Cache hash does not match source hash... retying download...')
+                    # Run another sync
+                    return self.__sync(
+                        content_url,
+                        save_to,
+                        source_hash=source_hash,
+                        source_hash_method=source_hash_method,
+                        dl_reties=dl_reties,
+                        up_retries=up_retries,
+                        force_dl=True,
+                        force_up=force_up
+                    )
+                elif not hash_verified and dl_reties >= 3:
+                    # Reached max retries
+                    print('Retried to download the package 3 times. Skipping :( ')
+                    return False
             else:
-                # Skipping hash verification
-                return True
+                print('Skipping cache hash verification...')
         else:
-            # File did not exists after DL
+            # API Error
+            print(''.join(['API error! Code: ', str(pull_request.status_code), ]))
             return False
 
-    def __upload_package(self, local_path, package_id, version, force=False):
-        """
-        :param local_path: 
-        :param package_id: 
-        :param version: 
-        :param force: 
-        :return: 
-        """
-        use_local_json = self.local_json_api
-        local_response = pull_package(package_id, version, self.local_packages_url, use_local_json)
-        if local_response and (local_response.status_code == 404 or force):
-            print('Uploading package...')
-            cmd = ' '.join([self.dotnet_path, 'nuget', 'push', local_path, '-s', self.local_api_upload_url, '-k',
-                            self.local_api_key])
-            return_code = call(cmd, shell=True)
-            upload_status = {
-                'response': return_code,
-                'mirrored': True,
-                'uploaded': True
-            }
-        elif local_response and local_response.status_code == 200:
-            print('Package already mirrored...')
-
-            if use_local_json:
-                data = local_response.json()['d']
-                server_hash = data['PackageHash']
-                hash_method = data['PackageHashAlgorithm']
-            else:
-                server_hash = local_response.objectified[KEY_PROPERTIES][KEY_HASH]
-                hash_method = local_response.objectified[KEY_PROPERTIES][KEY_ALGORITHM]
-
-            upload_status = {
-                'response': local_response,
-                'mirrored': True,
-                'uploaded': False,
-                'server_hash': server_hash,
-                'server_hash_method': hash_method
-            }
+        # Made it here? Cache hash either verified or skipped verification
+        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_up:
+            if pull_request.status_code == 404 or force_up:
+                # Send the package up
+                push_package(self.dotnet_path, save_to, self.local_api_upload_url, self.local_api_key)
         else:
-            return {
-                'response': local_response,
-                'mirrored': False,
-                'uploaded': False,
-                'server_hash': False,
-                'server_hash_method': False
-            }
+            # API Error
+            # This should never happen. It should get caught above
+            print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+            return False
 
-        if 'server_hash' not in upload_status and self.verify_uploaded:
-            r = pull_package(package_id, version, self.local_packages_url, use_local_json)
-            if r.status_code == 200:
-
-                if use_local_json:
-                    data = r.json()['d']
-                    server_hash = data['PackageHash']
-                    hash_method = data['PackageHashAlgorithm']
+        # If we have a source hash Start verifying it
+        if source_hash is not None and self.verify_uploaded:
+            use_target_json = self.local_json_api
+            # Pull the package after uploading it
+            pull_request = pull_package(package_name, version, self.local_packages_url, use_target_json)
+            # Did we find the package
+            if pull_request.status_code == 200:
+                # Get the hash
+                if use_target_json:
+                    # If we are using a json api get it this way
+                    target_hash = pull_request.json()['d']['PackageHash']
                 else:
-                    server_hash = r.objectified[KEY_PROPERTIES][KEY_HASH]
-                    hash_method = r.objectified[KEY_PROPERTIES][KEY_ALGORITHM]
+                    # If we use the XML api get it this way
+                    target_hash = pull_request.objectified[KEY_PROPERTIES][KEY_HASH]
 
-                upload_status['server_hash'] = server_hash
-                upload_status['server_hash_method'] = hash_method
+                # Does the source hash match the target repo hash?
+                if hashes_match(target_hash, source_hash):
+                    print('Package synced and verified!')
+                    return True
+                else:
+                    print('Package synced but checksum do not match!')
+                    return False
+
+            elif up_retries <= 3:
+                up_retries += 1
+                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                print('Package not synced retrying...')
+                return self.__sync(
+                    content_url,
+                    save_to,
+                    source_hash=source_hash,
+                    source_hash_method=source_hash_method,
+                    dl_reties=dl_reties,
+                    up_retries=up_retries,
+                    force_dl=False,
+                    force_up=True
+                )
+
+            elif up_retries >= 3:
+                print ('Max upload retries reached. Skipping :-( ')
+                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                return False
+
             else:
-                upload_status['server_hash'] = False
-                upload_status['server_hash_method'] = False
+                # API Error
+                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                return False
+        else:
+            print('Package synced!')
+            return True
 
-        return upload_status
-
-    def sync_and_verify_package(self, package, retry=0):
+    def sync_package(self, package):
         """
-        :param package: 
-        :param retry: 
+        :param package:
         :return: 
         """
         # Extract the info that we need from the package entry
         # Dict keys vary depending if the page was pulled in XML or JSON
         use_remote_json = self.remote_json_api
-        package_id = str(package[KEY_TITLE])
+        package_name = str(package[KEY_TITLE['json']]) if use_remote_json else str(package[KEY_TITLE['xml']])
         version = str(package['Version']) if use_remote_json else str(package[KEY_PROPERTIES][KEY_VERSION])
         metadata = package['__metadata'] if use_remote_json else {}
-        package_name = '.'.join([package_id, version])
+        package_n_v = '.'.join([package_name, version])
         content_url = metadata['media_src'] if use_remote_json else package[KEY_CONTENT].get(KEY_SRC)
-        local_path = os.path.join(self.package_storage_path, '.'.join([package_name, 'nupkg']))
+        save_to = os.path.join(self.package_storage_path, '.'.join([package_n_v, 'nupkg']))
         if use_remote_json:
-            remote_hash = str(package['PackageHash']) if self.verify_downloads else None
-            remote_hash_method = str(package['PackageHashAlgorithm']).lower() if self.verify_downloads else None
+            remote_hash = str(package['PackageHash'])
+            remote_hash_method = str(package['PackageHashAlgorithm']).lower()
         else:
-            remote_hash = str(package[KEY_PROPERTIES][KEY_HASH]) if self.verify_downloads else None
-            remote_hash_method = str(package[KEY_PROPERTIES][KEY_ALGORITHM]).lower() if self.verify_downloads else None
-        dl_status = False
-        # up_status = {}
+            remote_hash = str(package[KEY_PROPERTIES][KEY_HASH])
+            remote_hash_method = str(package[KEY_PROPERTIES][KEY_ALGORITHM]).lower()
 
         # Begin package sync
         print('')
-        print(''.join(['########## ', package_name, ' ##########']))
+        print(''.join(['########## ', package_n_v, ' ##########']))
 
-        if not os.path.isfile(local_path):
-            dl_status = self.__download_package(
-                content_url,
-                local_path,
-                remote_hash=remote_hash,
-                remote_hash_method=remote_hash_method
-            )
-        else:
-            if self.verify_cache:
-                if not verify_hash(local_path, remote_hash, hash_method=remote_hash_method):
-                    os.remove(local_path)
-                    dl_status = self.__download_package(
-                        content_url,
-                        local_path,
-                        remote_hash=remote_hash,
-                        remote_hash_method=remote_hash_method,
-                        force=True
-                    )
-                else:
-                    dl_status = True
+        sync = self.__sync(content_url, save_to, package_name, version, source_hash=remote_hash,
+                           source_hash_method=remote_hash_method)
 
-        if dl_status:
-            up_status = self.__upload_package(local_path, package_id, version)
-            if up_status['mirrored']:
-                if self.verify_uploaded and up_status['server_hash']:
-                    sys.stdout.write('Verifying server hashes...')
-                    sys.stdout.flush()
-                    if not hashes_match(remote_hash, up_status['server_hash']):
-                        print('Mirror and repo hashes do not match! Re-uploading...')
-                        up_status = self.__upload_package(local_path, package_id, version, True)
-                        if not hashes_match(remote_hash, up_status['server_hash']):
-                            if retry < 3:
-                                retry += 1
-                                up_status = self.sync_and_verify_package(package, retry)
-                            else:
-                                print('Max sync retries reached! Moving on...')
-                                return up_status
-
-                if up_status['uploaded']:
-                    print('Package uploaded!')
-
-                if not up_status['uploaded']:
-                    print('Package already uploaded!')
-            else:
-                # print(''.join(['Response Body: ', up_status['response'].text])) # @todo might want this for debug
-                print('Package not mirrored!')
-        else:
-            up_status = {
-                'response': None,
-                'mirrored': False,
-                'uploaded': False,
-                'server_hash': False
-            }
-        print('')
-        return up_status
+        print('Done!')
+        return sync
 
     def sync_packages(self):
         """        
@@ -310,7 +249,7 @@ class Mirror(object):
                     # For each result
                     for package in results:
                         # sync it!
-                        self.sync_and_verify_package(package)
+                        self.sync_package(package)
 
                     # done = True  # @todo this is temporary
 
@@ -328,7 +267,7 @@ class Mirror(object):
                     if len(page.entry) > 0:
                         for package in page.entry:
                             # sync it!
-                            self.sync_and_verify_package(package)
+                            self.sync_package(package)
                     # Get the last link on the page
                     link = page.link[0] if 0 > (len(page.link) - 1) else page.link[(len(page.link) - 1)]
                     # If the last link is the next link set it's url as the target url for the next iteration

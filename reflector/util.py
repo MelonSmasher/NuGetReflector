@@ -1,8 +1,10 @@
 from lxml import objectify
 from requests import get
+from subprocess import call
 import hashlib
 import base64
 import sys
+import os
 
 
 def _pull(url, json=False):
@@ -48,6 +50,50 @@ def pull_packages(url, json=False):
     return _pull(url, json=json)
 
 
+def push_package(dotnet, package_path, repo_url, api_key):
+    """
+    :param dotnet: 
+    :param package_path: 
+    :param repo_url: 
+    :param api_key: 
+    :return: 
+    """
+    cmd = ' '.join([dotnet, 'nuget', 'push', package_path, '-s', repo_url, '-k', api_key])
+    return call(cmd, shell=True)
+
+
+def download_file(url, save_to):
+    """
+    :param url: 
+    :param save_to: 
+    :return: 
+    """
+    count = 0
+    sys.stdout.write('Downloading.')
+    sys.stdout.flush()
+    # Does the file already exist?
+    if os.path.isfile(save_to):
+        # If the file exists remove it since we forced
+        os.remove(save_to)
+    # Get the file and stream it to the disk
+    r = get(url, stream=True)
+    with open(save_to, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                # Count the chunks
+                count += 1
+                if count >= 1024:
+                    # Write a dot every 1024 chunks
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                    count = 0
+                # Write to the file when the chunk gets to 1024
+                f.write(chunk)
+                f.flush()
+    print(' Done!')
+    return True if os.path.isfile(save_to) else False
+
+
 def sha512sum(file_path, block_size=65536):
     """
     :param file_path: 
@@ -88,16 +134,12 @@ def hashes_match(hash_1, hash_2):
     :return: 
     """
     if str(hash_1) == str(hash_2):
-        print(' Pass!')
         return True
     else:
-        print(' Fail!')
-        print('Hash 1: ' + hash_1)
-        print('Hash 2: ' + hash_2)
         return False
 
 
-def verify_hash(file_path, target_hash, message='Verifying package hash...', hash_method='sha512'):
+def verify_hash(file_path, target_hash, message='Verifying package hash.', hash_method='sha512'):
     """
     :param file_path: 
     :param target_hash: 
@@ -110,14 +152,20 @@ def verify_hash(file_path, target_hash, message='Verifying package hash...', has
     hash_method.lower()
 
     if hash_method == 'sha512':
+        sys.stdout.write('.')
         local_hash = sha512sum(file_path)
+        sys.stdout.write('.')
     elif hash_method == 'sha256':
         local_hash = sha256sum(file_path)
+        sys.stdout.write('.')
     elif hash_method == 'sha1':
+        sys.stdout.write('.')
         local_hash = sha1sum(file_path)
     else:
+        sys.stdout.write('.')
         local_hash = sha512sum(file_path)
 
+    print('. Done!')
     return hashes_match(local_hash, target_hash)
 
 

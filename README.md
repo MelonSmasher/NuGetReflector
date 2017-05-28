@@ -64,7 +64,6 @@ pip install -r requirements.txt;
 - `hash:`
   - `verify_downloads:` - Verify downloaded package hash. You should leave this enabled # Default: true
   - `verify_uploaded:` - Verify package hash after it has been uploaded to the mirror. You should leave this enabled # Default: true
-  - `verify_cache:` - Re-verify previously downloaded package hashes. This is usually not needed and can reduce performance # Default: false
 
 # Usage:
 

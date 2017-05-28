@@ -10,4 +10,3 @@ local:
 hash:
   verify_downloads: true
   verify_uploaded: true
-  verify_cache: false # Will reduce performance

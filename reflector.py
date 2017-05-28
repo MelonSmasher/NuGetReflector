@@ -13,8 +13,7 @@ def main():
         config.local_api_key,
         config.dotnet_path,
         config.hash_verify_downloads,
-        config.hash_verify_uploaded,
-        config.hash_verify_cache,
+        config.hash_verify_uploaded
     )
     mirror.sync_packages()
 

@@ -253,7 +253,6 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         while not done:
-            print(url)
             # pull packages from the remote api
             response = pull_packages(url, json=use_remote_json)
             # was the response good?

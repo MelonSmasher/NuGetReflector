@@ -131,8 +131,25 @@ class Mirror(object):
         # Made it here? Cache hash either verified or skipped verification
         if pull_request.status_code == 404 or pull_request.status_code == 200 or force_up:
             if pull_request.status_code == 404 or force_up:
-                # Send the package up
-                push_package(self.dotnet_path, save_to, self.local_api_upload_url, self.local_api_key)
+                # Send the package up using the dotnet binary
+                return_code = push_package_dotnet(
+                    save_to,
+                    self.local_api_upload_url,
+                    self.local_api_key,
+                    self.dotnet_path
+                )
+
+                if return_code is not 0:
+                    print('Push failed, retying with native library.')
+                    print('Uploading package...')
+                    # If the dotnet binary does not return 0 try to use a python library
+                    response = push_package_native(
+                        save_to,
+                        self.local_api_upload_url,
+                        self.local_api_key
+                    )
+                    print(''.join(['Response code: ', response.status_code]))
+
         else:
             # API Error
             # This should never happen. It should get caught above

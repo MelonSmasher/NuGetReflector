@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from requests import get
+from requests import get, put
 from subprocess import call
 import hashlib
 import base64
@@ -44,16 +44,29 @@ def pull_packages(url, json=False):
     return _pull(url, json=json)
 
 
-def push_package(dotnet, package_path, repo_url, api_key):
+def push_package_dotnet(package_path, repo_url, api_key, dotnet):
     """
+    :param package_path: 
+    :param repo_url: 
+    :param api_key: 
     :param dotnet: 
+    :return: 
+    """
+    cmd = ' '.join([dotnet, 'nuget', 'push', package_path, '-s', repo_url, '-k', api_key])
+    return call(cmd, shell=True)
+
+
+def push_package_native(package_path, repo_url, api_key):
+    """
     :param package_path: 
     :param repo_url: 
     :param api_key: 
     :return: 
     """
-    cmd = ' '.join([dotnet, 'nuget', 'push', package_path, '-s', repo_url, '-k', api_key])
-    return call(cmd, shell=True)
+    f = open(package_path, mode='rb')
+    files = {'package': ('package', f, 'application/octet-stream')}
+    headers = {'X-NuGet-ApiKey': api_key}
+    return put(repo_url, files=files, headers=headers)
 
 
 def download_file(url, save_to):

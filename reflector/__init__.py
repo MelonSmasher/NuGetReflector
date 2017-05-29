@@ -110,6 +110,8 @@ class Mirror(object):
                     return self.__sync(
                         content_url,
                         save_to,
+                        package_name,
+                        version,
                         source_hash=source_hash,
                         source_hash_method=source_hash_method,
                         dl_reties=dl_reties,
@@ -143,12 +145,15 @@ class Mirror(object):
                     print('Push failed, retying with native library.')
                     print('Uploading package...')
                     # If the dotnet binary does not return 0 try to use a python library
-                    response = push_package_native(
+                    push_response = push_package_native(
                         save_to,
                         self.local_api_upload_url,
                         self.local_api_key
                     )
-                    print(''.join(['Response code: ', response.status_code]))
+                    print(''.join(['Response code: ', str(push_response.status_code)]))
+                    if push_response.status_code is not 200:
+                        print('Upload failed... :-(')
+                        print(''.join(['Response message: ', str(push_response.content)]))
 
         else:
             # API Error
@@ -186,6 +191,8 @@ class Mirror(object):
                 return self.__sync(
                     content_url,
                     save_to,
+                    package_name,
+                    version,
                     source_hash=source_hash,
                     source_hash_method=source_hash_method,
                     dl_reties=dl_reties,

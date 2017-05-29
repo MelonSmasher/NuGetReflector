@@ -1,8 +1,10 @@
 remote:
   url: https://chocolatey.org/
+  json_api: false
 
 local:
   url: http://localhost/
+  json_api: false
   api_key: null # Fill this in
   package_storage_path: storage/packages/
   dotnet_path: false # Example: /usr/local/share/dotnet/dotnet

@@ -1,4 +1,4 @@
-from lxml import objectify
+from bs4 import BeautifulSoup
 from requests import get
 from subprocess import call
 import hashlib
@@ -15,19 +15,13 @@ def _pull(url, json=False):
     """
     if json:
         headers = {'Accept': 'application/json'}
-        return get(url, headers=headers)
+        response = get(url, headers=headers)
     else:
         response = get(url)
         if response.status_code == 200:
-            xml = response.content
-            try:
-                response.objectified = objectify.fromstring(xml)
-                return response
-            except Exception as e:
-                print(e.message)
-                return False
-        else:
-            return response
+            response.objectified = BeautifulSoup(response.content, 'xml')
+
+    return response
 
 
 def pull_package(title, version, url, json=False):

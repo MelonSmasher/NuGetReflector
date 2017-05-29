@@ -4,12 +4,6 @@ from time import sleep
 from yaml import load
 from reflector.util import *
 
-NAME_SCHEME_META = '{http://schemas.microsoft.com/ado/2007/08/dataservices/metadata}'
-NAME_SCHEME_DATA = '{http://schemas.microsoft.com/ado/2007/08/dataservices}'
-KEY_PROPERTIES = ''.join([NAME_SCHEME_META, 'properties'])
-KEY_VERSION = ''.join([NAME_SCHEME_DATA, 'Version'])
-KEY_HASH = ''.join([NAME_SCHEME_DATA, 'PackageHash'])
-KEY_ALGORITHM = ''.join([NAME_SCHEME_DATA, 'PackageHashAlgorithm'])
 KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'
 KEY_SRC = 'src'
@@ -96,9 +90,7 @@ class Mirror(object):
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
         # What did the target api return
-        if pull_request and (
-                        pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(
-                save_to)):
+        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(save_to):
             # Download the file if we are forcing or it was not already uploaded or cached
             if pull_request.status_code == 404 or not isfile(save_to) or force_dl:
                 if not download_file(content_url, save_to):
@@ -133,11 +125,11 @@ class Mirror(object):
                 print('Skipping cache hash verification...')
         else:
             # API Error
-            print(''.join(['API error! Code: ', str(pull_request.status_code), ]))
+            print(''.join(['API error! Code: ', str(pull_request.status_code)]))
             return False
 
         # Made it here? Cache hash either verified or skipped verification
-        if pull_request and (pull_request.status_code == 404 or pull_request.status_code == 200 or force_up):
+        if pull_request.status_code == 404 or pull_request.status_code == 200 or force_up:
             if pull_request.status_code == 404 or force_up:
                 # Send the package up
                 push_package(self.dotnet_path, save_to, self.local_api_upload_url, self.local_api_key)
@@ -153,14 +145,14 @@ class Mirror(object):
             # Pull the package after uploading it
             pull_request = pull_package(package_name, version, self.local_packages_url, use_target_json)
             # Did we find the package
-            if pull_request and pull_request.status_code == 200:
+            if pull_request.status_code == 200:
                 # Get the hash
                 if use_target_json:
                     # If we are using a json api get it this way
                     target_hash = pull_request.json()['d']['PackageHash']
                 else:
                     # If we use the XML api get it this way
-                    target_hash = pull_request.objectified[KEY_PROPERTIES][KEY_HASH]
+                    target_hash = pull_request.objectified.properties.PackageHash.text
 
                 # Does the source hash match the target repo hash?
                 if hashes_match(target_hash, source_hash):
@@ -206,18 +198,18 @@ class Mirror(object):
         # Extract the info that we need from the package entry
         # Dict keys vary depending if the page was pulled in XML or JSON
         use_remote_json = self.remote_json_api
-        package_name = str(package[KEY_TITLE['json']]) if use_remote_json else str(package[KEY_TITLE['xml']])
-        version = str(package['Version']) if use_remote_json else str(package[KEY_PROPERTIES][KEY_VERSION])
+        package_name = str(package[KEY_TITLE['json']]) if use_remote_json else str(package.title.text)
+        version = str(package['Version']) if use_remote_json else str(package.properties.Version.text)
         metadata = package['__metadata'] if use_remote_json else {}
+        content_url = metadata['media_src'] if use_remote_json else package.content['src']
         package_n_v = '.'.join([package_name, version])
-        content_url = metadata['media_src'] if use_remote_json else package[KEY_CONTENT].get(KEY_SRC)
         save_to = os.path.join(self.package_storage_path, '.'.join([package_n_v, 'nupkg']))
         if use_remote_json:
             remote_hash = str(package['PackageHash'])
             remote_hash_method = str(package['PackageHashAlgorithm']).lower()
         else:
-            remote_hash = str(package[KEY_PROPERTIES][KEY_HASH])
-            remote_hash_method = str(package[KEY_PROPERTIES][KEY_ALGORITHM]).lower()
+            remote_hash = str(package.properties.PackageHash.text)
+            remote_hash_method = str(package.properties.PackageHashAlgorithm.text).lower()
 
         # Begin package sync
         print('')
@@ -237,6 +229,7 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         while not done:
+            print(url)
             # pull packages from the remote api
             response = pull_packages(url, json=use_remote_json)
             # was the response good?
@@ -252,9 +245,6 @@ class Mirror(object):
                     for package in results:
                         # sync it!
                         self.sync_package(package)
-
-                    # done = True  # @todo this is temporary
-
                     # If we have a next key continue to the next page
                     if VALUE_NEXT['json'] in data:
                         # Set the url
@@ -265,20 +255,23 @@ class Mirror(object):
                 else:
                     # Handle XML pages
                     page = response.objectified
+                    entries = page.find_all('entry')
                     # Whats the size of the entry list
-                    if len(page.entry) > 0:
-                        for package in page.entry:
+                    if len(entries) > 0:
+                        for package in entries:
                             # sync it!
                             self.sync_package(package)
+
+                    links = page.find_all('link')
                     # Get the last link on the page
-                    link = page.link[0] if 0 > (len(page.link) - 1) else page.link[(len(page.link) - 1)]
+                    link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
                     # If the last link is the next link set it's url as the target url for the next iteration
-                    if link.get(KEY_REL) == VALUE_NEXT['xml']:
-                        url = link.get(KEY_HREF)
+                    if link[KEY_REL] == VALUE_NEXT['xml']:
+                        url = str(link['href'])
+                        print(' ')
                     else:
                         # Break out
                         done = True
-
             else:
                 print('Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
                     response.status_code))

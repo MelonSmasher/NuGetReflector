@@ -41,6 +41,7 @@ Have not tested on Windows.
 Get the source and configure options.
 
 ```shell
+cd /opt;
 git clone https://github.com/MelonSmasher/NuGetReflector.git;
 cd NuGetReflector;
 cp config/config.example.yaml config/config.yaml;
@@ -67,6 +68,16 @@ pip install -r requirements.txt;
 
 # Usage:
 
-```shell
-python reflector.py;
+#### Manually
+
+```bash
+./reflector.sh;
+```
+
+#### Cron Job
+
+Runs every 12 hours:
+
+```bash
+0 */12 * * * /opt/NuGetReflector/reflector.sh 2>&1 /opt/NuGetReflector/storage/log/cron.log
 ```

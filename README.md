@@ -8,7 +8,7 @@ This tool mirrors an NuGet repository to another NuGet server. This can be used 
 
 ### Needs:
 
-* Python >= 2.7
+* Python >= 2.7 (tested on 2.7.13)
 * Python < 3 
 * Pip
 * [DotNet CLI](https://github.com/dotnet/cli)

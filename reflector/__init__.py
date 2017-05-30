@@ -25,7 +25,7 @@ class Config(object):
             self.hash_verify_downloads = c['hash']['verify_downloads']
             self.hash_verify_uploaded = c['hash']['verify_uploaded']
             self.dotnet_path = c['local']['dotnet_path']
-            if not self.dotnet_path or not os.path.isfile(self.dotnet_path):
+            if not self.dotnet_path or not isfile(self.dotnet_path):
                 raise EnvironmentError('DotNot CLI executable is not configured or the path specified does not exist!')
 
 

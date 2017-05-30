@@ -79,5 +79,5 @@ pip install -r requirements.txt;
 Runs every 12 hours:
 
 ```bash
-0 */12 * * * /opt/NuGetReflector/reflector.sh 2>&1 /opt/NuGetReflector/storage/log/cron.log
+0 */12 * * * /opt/NuGetReflector/reflector.sh 1> /opt/NuGetReflector/storage/log/cron.log 2> /opt/NuGetReflector/storage/log/cron_error.log
 ```

@@ -2,6 +2,17 @@
 
 This tool mirrors an NuGet repository to another NuGet server. This can be used to clone public repositories or used to make private repositories redundant.
 
+### Features:
+
+- Full Sync - Fully reconcile your mirror against a remote repository.
+- Delta Sync - Catch up on newly created packages and new updated packages. Note: this requires an atom feed modeled after the [Chocolatey update feed](https://feeds.feedburner.com/chocolatey?format=xml).
+
+### Todo:
+
+- Improve logging
+- Windows testing
+- Threaded syncs... maybe, might be overkill
+
 ---
 
 # Install
@@ -77,10 +88,10 @@ Manually:
 ./reflector.py -f;
 ```
 
-Cron Job every 12 hours:
+Cron Job every 24 hours a 12:05 am:
 
 ```bash
-0 */12 * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --full 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
+5 0 * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --full 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```
 
 ### Incremental sync:

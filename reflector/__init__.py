@@ -1,9 +1,8 @@
 from __future__ import print_function
 from os.path import isfile
-from time import sleep, gmtime, strftime
+from time import sleep
 from yaml import load
 from reflector.util import *
-from datetime import datetime
 
 KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'

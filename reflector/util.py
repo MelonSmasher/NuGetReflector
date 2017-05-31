@@ -5,6 +5,8 @@ import hashlib
 import base64
 import sys
 import os
+import time
+import datetime
 
 
 def _pull(url, json=False):
@@ -182,6 +184,80 @@ def verify_hash(file_path, target_hash, message='Verifying package hash.', hash_
 
     print('. Done!')
     return hashes_match(local_hash, target_hash)
+
+
+def utc_to_epoch(time_stamp, time_format='%Y-%m-%dT%H:%M:%SZ'):
+    """
+    :param time_stamp:
+    :param time_format:
+    :return:
+    """
+    return int(time.mktime(time.strptime(time_stamp, time_format)))
+
+
+def epoch_to_utc(epoch=0, time_format='%Y-%m-%dT%H:%M:%SZ'):
+    """
+    :param epoch:
+    :param time_format:
+    :return:
+    """
+    return time.strftime(time_format, time.gmtime(epoch))
+
+
+def now_as_epoch():
+    """
+    :return:
+    """
+    return int(time.time())
+
+
+def first_epoch():
+    """
+    :return:
+    """
+    return int(0)
+
+
+def now_as_utc(time_format='%Y-%m-%dT%H:%M:%SZ'):
+    """
+    :param time_format:
+    :return:
+    """
+    return datetime.datetime.now().strftime(time_format)
+
+
+def touch(file_path):
+    """
+    :param file_path:
+    :return:
+    """
+    with open(file_path, 'a'):
+        os.utime(file_path, None)
+
+
+def store_delta(delta, file_path='storage/sync.delta'):
+    """
+    :param delta:
+    :param file_path:
+    :return:
+    """
+    touch(file_path)
+    with open(file_path, 'w') as f:
+        f.write(''.join([delta, "\n"]))
+
+
+def read_delta(file_path='storage/sync.delta'):
+    """
+    :param file_path:
+    :return:
+    """
+    touch(file_path)
+    try:
+        with open(file_path, 'rb') as f:
+            f.seek(-21, 2)
+            return str(f.readlines()[-1].decode().rstrip("\n"))
+    except IOError:
+        return None
 
 
 def __hash_byte_str_iter(bytes_iter, hasher, as_hex_str=False):

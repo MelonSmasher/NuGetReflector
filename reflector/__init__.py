@@ -252,11 +252,15 @@ class Mirror(object):
 
     def delta_sync(self):
         url = self.update_feed
-        time_pattern = '%Y-%m-%dT%H:%M:%SZ'
+        now = now_as_epoch()
+        last = read_delta()
 
-        # @todo Read delta file grab last epoch
-        # @todo if not there make it
-        # @todo grab the current epoch
+        if last is not None:
+            print(' '.join(['Syncing packages since:', last]))
+            last = utc_to_epoch(last)
+        else:
+            print('No previous delta syncs. Syncing all updates!')
+            last = first_epoch()
 
         # Grab the update feed
         response = pull_updates(url)
@@ -269,19 +273,24 @@ class Mirror(object):
             # Loop over the items
             for item in items:
                 # Get when this was updated
-                updated = item.updated.text
-
-                # @todo determine if it has been updated since the last run
-
-                if True:
+                updated = utc_to_epoch(item.updated.text)
+                # determine if it has been updated since the last run
+                if updated >= last:
                     # Grab the package info
                     parts = str(item.origLink.text).split('/')
                     version = parts[-1]
                     title = parts[-2]
                     # Sync the package
-                    # package = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
+                    pull_response = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
+                    if pull_response.status_code == 200:
+                        package = pull_response.json() if self.remote_json_api else pull_response.objectified
+                        self.sync_package(package)
+                    else:
+                        print('Received bad http code from remote API when pulling package. Response Code: ' + str(
+                            pull_response.status_code))
 
-        # @todo write an epoch to the delta file
+            # write epoch to the delta file
+            store_delta(epoch_to_utc(now))
 
         else:
             print('Received bad http code from remote API. Response Code: ' + str(response.status_code))

@@ -83,7 +83,7 @@ Cron Job every 12 hours:
 0 */12 * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --full 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```
 
-### incremental sync:
+### Incremental sync:
 
 Manually:
 

@@ -44,6 +44,14 @@ def pull_packages(url, json=False):
     return _pull(url, json=json)
 
 
+def pull_updates(url):
+    """
+    :param url:
+    :return:
+    """
+    return _pull(url, json=False)
+
+
 def push_package_dotnet(package_path, repo_url, api_key, dotnet):
     """
     :param package_path: 

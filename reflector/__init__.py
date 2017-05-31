@@ -1,8 +1,9 @@
 from __future__ import print_function
 from os.path import isfile
-from time import sleep
+from time import sleep, gmtime, strftime
 from yaml import load
 from reflector.util import *
+from datetime import datetime
 
 KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'
@@ -17,6 +18,7 @@ class Config(object):
         with open('config/config.yaml') as data_file:
             c = load(data_file)
             self.remote_url = c['remote']['url'].rstrip('/')
+            self.update_feed = c['remote']['update_feed']
             self.remote_json_api = c['remote']['json_api']
             self.local_url = c['local']['url'].rstrip('/')
             self.local_json_api = c['local']['json_api']
@@ -32,6 +34,7 @@ class Config(object):
 class Mirror(object):
     def __init__(self,
                  remote_url,
+                 update_feed,
                  remote_json_api,
                  local_url,
                  local_json_api,
@@ -42,17 +45,19 @@ class Mirror(object):
                  verify_uploaded=True
                  ):
         """
-        :param remote_url: 
-        :param remote_json_api: 
-        :param local_url: 
-        :param local_json_api: 
-        :param package_storage_path: 
-        :param local_api_key: 
-        :param dotnet_path: 
-        :param verify_downloads: 
-        :param verify_uploaded: 
+        :param remote_url:
+        :param update_feed:
+        :param remote_json_api:
+        :param local_url:
+        :param local_json_api:
+        :param package_storage_path:
+        :param local_api_key:
+        :param dotnet_path:
+        :param verify_downloads:
+        :param verify_uploaded:
         """
         self.remote_api_url = '/'.join([remote_url, 'api/v2'])
+        self.update_feed = update_feed
         self.remote_json_api = remote_json_api
         self.remote_packages_url = '/'.join([self.remote_api_url, 'Packages'])
         self.local_api_url = '/'.join([local_url, 'api/v2'])
@@ -244,6 +249,45 @@ class Mirror(object):
 
         print('Done!')
         return sync
+
+    def delta_sync(self):
+        url = self.update_feed
+        time_pattern = '%Y-%m-%dT%H:%M:%SZ'
+
+        # @todo Read delta file grab last epoch
+        # @todo if not there make it
+        # @todo grab the current epoch
+
+        # Grab the update feed
+        response = pull_updates(url)
+        # Did the request go well?
+        if response.status_code == 200:
+            # Get the page
+            page = response.objectified
+            # Get all items
+            items = page.find_all('item')
+            # Loop over the items
+            for item in items:
+                # Get when this was updated
+                updated = item.updated.text
+
+                # @todo determine if it has been updated since the last run
+
+                if True:
+                    # Grab the package info
+                    parts = str(item.origLink.text).split('/')
+                    version = parts[-1]
+                    title = parts[-2]
+                    # Sync the package
+                    # package = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
+
+        # @todo write an epoch to the delta file
+
+        else:
+            print('Received bad http code from remote API. Response Code: ' + str(response.status_code))
+            return False
+
+        return True
 
     def sync_packages(self):
         """        

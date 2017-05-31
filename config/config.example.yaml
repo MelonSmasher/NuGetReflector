@@ -1,5 +1,6 @@
 remote:
   url: https://chocolatey.org/
+  update_feed: https://feeds.feedburner.com/chocolatey?format=xml # Set to false to disable
   json_api: false
 
 local:

@@ -53,6 +53,7 @@ pip install -r requirements.txt;
 
 - `remote:`
    - `url:` - remote repo to mirror # Default: https://chocolatey.org/
+   - `update_feed:` xml feed that supplies updates # Default: https://feeds.feedburner.com/chocolatey?format=xml
    - `json_api:` - request json from remote API # Default false
 
 - `local:`
@@ -68,16 +69,30 @@ pip install -r requirements.txt;
 
 # Usage:
 
-#### Manually
+### Full sync:
+
+Manually:
 
 ```bash
-./reflector.sh;
+./reflector.py -f;
 ```
 
-#### Cron Job
-
-Runs every 12 hours:
+Cron Job every 12 hours:
 
 ```bash
-0 */12 * * * /opt/NuGetReflector/reflector.sh 1> /opt/NuGetReflector/storage/log/cron.log 2> /opt/NuGetReflector/storage/log/cron_error.log
+0 */12 * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --full 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
+```
+
+### Incremental sync:
+
+Manually:
+
+```bash
+./reflector.py -d;
+```
+
+Cron Job every 5 minutes:
+
+```bash
+*/5 * * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --delta 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```

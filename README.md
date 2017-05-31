@@ -10,7 +10,7 @@ This tool mirrors an NuGet repository to another NuGet server. This can be used 
 ### Todo:
 
 - Improve logging
-- Windows testing
+- Support multiple mirrors
 - Threaded syncs... maybe, might be overkill
 
 ---

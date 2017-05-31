@@ -94,7 +94,7 @@ Cron Job every 24 hours a 12:05 am:
 5 0 * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --full 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```
 
-### Incremental sync:
+### Incremental "delta" sync:
 
 Manually:
 
@@ -102,8 +102,12 @@ Manually:
 ./reflector.py -d;
 ```
 
-Cron Job every 5 minutes:
+Cron Job every minute:
 
 ```bash
-*/5 * * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --delta 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
+*/1 * * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --delta 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```
+
+# Contributing:
+
+See the [contribution guidelines](CONTRIBUTING.md).

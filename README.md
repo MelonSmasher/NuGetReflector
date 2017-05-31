@@ -102,10 +102,10 @@ Manually:
 ./reflector.py -d;
 ```
 
-Cron Job every minute:
+Cron Job every 10 minutes:
 
 ```bash
-*/1 * * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --delta 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
+*/10 * * * * cd /opt/NuGetReflector; python /opt/NuGetReflector/reflector.py --delta 1>> /opt/NuGetReflector/storage/log/sync.log 2>> /opt/NuGetReflector/storage/log/error.log
 ```
 
 # Contributing:

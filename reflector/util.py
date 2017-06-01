@@ -186,7 +186,7 @@ def verify_hash(file_path, target_hash, message='Verifying package hash.', hash_
     return hashes_match(local_hash, target_hash)
 
 
-def localtime_to_epoch(time_stamp, time_format='%Y-%m-%dT%H:%M:%SZ'):
+def utc_to_epoch(time_stamp, time_format='%Y-%m-%dT%H:%M:%SZ'):
     """
     :param time_stamp:
     :param time_format:
@@ -195,13 +195,13 @@ def localtime_to_epoch(time_stamp, time_format='%Y-%m-%dT%H:%M:%SZ'):
     return int(time.mktime(time.strptime(time_stamp, time_format)))
 
 
-def epoch_to_localtime(epoch=0, time_format='%Y-%m-%dT%H:%M:%SZ'):
+def epoch_to_utc(epoch=0, time_format='%Y-%m-%dT%H:%M:%SZ'):
     """
     :param epoch:
     :param time_format:
     :return:
     """
-    return time.strftime(time_format, time.localtime(epoch))
+    return time.strftime(time_format, time.gmtime(epoch))
 
 
 def now_as_epoch():
@@ -218,7 +218,7 @@ def first_epoch():
     return int(0)
 
 
-def now_as_localtime(time_format='%Y-%m-%dT%H:%M:%SZ'):
+def now_as_utc(time_format='%Y-%m-%dT%H:%M:%SZ'):
     """
     :param time_format:
     :return:

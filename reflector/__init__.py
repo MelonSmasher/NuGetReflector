@@ -251,15 +251,15 @@ class Mirror(object):
 
     def delta_sync(self):
         url = self.update_feed
-        now = now_as_epoch()
-        last = read_delta()
+        previous_delta = read_delta()
+        new_delta = None
 
-        if last is not None:
-            print(' '.join(['Syncing packages since:', last]))
-            last = localtime_to_epoch(last)
+        if previous_delta is not None:
+            print(' '.join(['Syncing packages since:', previous_delta]))
+            previous_delta = utc_to_epoch(previous_delta)
         else:
             print('No previous delta syncs. Syncing all updates!')
-            last = first_epoch()
+            previous_delta = first_epoch()
 
         # Grab the update feed
         response = pull_updates(url)
@@ -272,9 +272,12 @@ class Mirror(object):
             # Loop over the items
             for item in items:
                 # Get when this was updated
-                updated = localtime_to_epoch(item.updated.text)
+                updated = utc_to_epoch(item.updated.text)
+                # Get the new delta on the first package
+                if new_delta is None:
+                    new_delta = item.updated.text
                 # determine if it has been updated since the last run
-                if updated >= last:
+                if updated > previous_delta:
                     # Grab the package info
                     parts = str(item.origLink.text).split('/')
                     version = parts[-1]
@@ -288,8 +291,11 @@ class Mirror(object):
                         print('Received bad http code from remote API when pulling package. Response Code: ' + str(
                             pull_response.status_code))
 
+            # If the new delta is still not set. Set it to the previous one
+            if new_delta is None:
+                new_delta = epoch_to_utc(previous_delta)
             # write epoch to the delta file
-            store_delta(epoch_to_localtime(now))
+            store_delta(new_delta)
 
         else:
             print('Received bad http code from remote API. Response Code: ' + str(response.status_code))

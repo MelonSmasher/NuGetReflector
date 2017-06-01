@@ -256,7 +256,7 @@ class Mirror(object):
 
         if last is not None:
             print(' '.join(['Syncing packages since:', last]))
-            last = utc_to_epoch(last)
+            last = localtime_to_epoch(last)
         else:
             print('No previous delta syncs. Syncing all updates!')
             last = first_epoch()
@@ -272,7 +272,7 @@ class Mirror(object):
             # Loop over the items
             for item in items:
                 # Get when this was updated
-                updated = utc_to_epoch(item.updated.text)
+                updated = localtime_to_epoch(item.updated.text)
                 # determine if it has been updated since the last run
                 if updated >= last:
                     # Grab the package info
@@ -289,7 +289,7 @@ class Mirror(object):
                             pull_response.status_code))
 
             # write epoch to the delta file
-            store_delta(epoch_to_utc(now))
+            store_delta(epoch_to_localtime(now))
 
         else:
             print('Received bad http code from remote API. Response Code: ' + str(response.status_code))

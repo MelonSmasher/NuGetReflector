@@ -37,8 +37,8 @@ def _pull(url, json=False):
                 print('Timed out when trying to pull...')
         tries += 1
         print('Timed out when trying to pull.')
-        print('Sleeping for 25 then trying again...')
-        time.sleep(25)
+        print('Sleeping for 10 then trying again...')
+        time.sleep(10)
     return False
 
 

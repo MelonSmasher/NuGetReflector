@@ -1,5 +1,6 @@
 from __future__ import print_function
-from os.path import isfile
+from os.path import isfile, exists
+from os import mknod, remove
 from time import sleep
 from yaml import load
 from reflector.util import *
@@ -257,54 +258,61 @@ class Mirror(object):
         url = self.update_feed
         previous_delta = read_delta()
         new_delta = None
+        lock_file = '/tmp/reflector_full.lock'
+        delta_lock_file = '/tmp/reflector_delta.lock'
+        if not exists(lock_file) and not exists(delta_lock_file):
+            # Create the lock file
+            mknod(delta_lock_file)
 
-        if previous_delta is not None:
-            print(' '.join(['Syncing packages since:', previous_delta]))
-            previous_delta = utc_to_epoch(previous_delta)
-        else:
-            print('No previous delta syncs. Syncing all updates!')
-            previous_delta = first_epoch()
+            if previous_delta is not None:
+                print(' '.join(['Syncing packages since:', previous_delta]))
+                previous_delta = utc_to_epoch(previous_delta)
+            else:
+                print('No previous delta syncs. Syncing all updates!')
+                previous_delta = first_epoch()
 
-        # Grab the update feed
-        response = pull_updates(url)
-        # Did the request go well?
-        if response.status_code == 200:
-            # Get the page
-            page = response.objectified
-            # Get all items
-            items = page.find_all('item')
-            # Loop over the items
-            for item in items:
-                # Get when this was updated
-                updated = utc_to_epoch(item.updated.text)
-                # Get the new delta on the first package
+            # Grab the update feed
+            response = pull_updates(url)
+            # Did the request go well?
+            if response.status_code == 200:
+                # Get the page
+                page = response.objectified
+                # Get all items
+                items = page.find_all('item')
+                # Loop over the items
+                for item in items:
+                    # Get when this was updated
+                    updated = utc_to_epoch(item.updated.text)
+                    # Get the new delta on the first package
+                    if new_delta is None:
+                        new_delta = item.updated.text
+                    # determine if it has been updated since the last run
+                    if updated > previous_delta:
+                        # Grab the package info
+                        parts = str(item.origLink.text).split('/')
+                        version = parts[-1]
+                        title = parts[-2]
+                        # Sync the package
+                        pull_response = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
+                        if pull_response.status_code == 200:
+                            package = pull_response.json() if self.remote_json_api else pull_response.objectified
+                            self.sync_package(package)
+                        else:
+                            print('Received bad http code from remote API when pulling package. Response Code: ' + str(
+                                pull_response.status_code))
+
+                # If the new delta is still not set. Set it to the previous one
                 if new_delta is None:
-                    new_delta = item.updated.text
-                # determine if it has been updated since the last run
-                if updated > previous_delta:
-                    # Grab the package info
-                    parts = str(item.origLink.text).split('/')
-                    version = parts[-1]
-                    title = parts[-2]
-                    # Sync the package
-                    pull_response = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
-                    if pull_response.status_code == 200:
-                        package = pull_response.json() if self.remote_json_api else pull_response.objectified
-                        self.sync_package(package)
-                    else:
-                        print('Received bad http code from remote API when pulling package. Response Code: ' + str(
-                            pull_response.status_code))
-
-            # If the new delta is still not set. Set it to the previous one
-            if new_delta is None:
-                new_delta = epoch_to_utc(previous_delta)
-            # write epoch to the delta file
-            store_delta(new_delta)
-
+                    new_delta = epoch_to_utc(previous_delta)
+                # write epoch to the delta file
+                store_delta(new_delta)
+                # remove the lock file
+                remove(delta_lock_file)
+            else:
+                print('Received bad http code from remote API. Response Code: ' + str(response.status_code))
+                return False
         else:
-            print('Received bad http code from remote API. Response Code: ' + str(response.status_code))
-            return False
-
+            print('Lock file exists, is there a sync session running?')
         return True
 
     def sync_packages(self):
@@ -315,66 +323,75 @@ class Mirror(object):
         cool_down_counter = 250
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
-        while not done:
-            print('Pulling packages from: ' + url)
-            # pull packages from the remote api
-            response = pull_packages(url, json=use_remote_json)
-            if response:
-                # was the response good?
-                if response.status_code == 200:
-                    if use_remote_json:
-                        # Handle JSON pages
-                        page = response.json()
-                        # data object
-                        data = page['d']
-                        # Grab the results
-                        results = data['results'] if 'results' in data else []
-                        # For each result
-                        for package in results:
-                            # sync it!
-                            self.sync_package(package)
-                        # If we have a next key continue to the next page
-                        if VALUE_NEXT['json'] in data:
-                            # Set the url
-                            url = data[VALUE_NEXT['json']]
-                        else:
-                            # Break out
-                            done = True
-                    else:
-                        # Handle XML pages
-                        page = response.objectified
-                        entries = page.find_all('entry')
-                        # Whats the size of the entry list
-                        if len(entries) > 0:
-                            for package in entries:
+        lock_file = '/tmp/reflector_full.lock'
+
+        if not exists(lock_file):
+            # Create the lock file
+            mknod(lock_file)
+            while not done:
+                print('Pulling packages from: ' + url)
+                # pull packages from the remote api
+                response = pull_packages(url, json=use_remote_json)
+                if response:
+                    # was the response good?
+                    if response.status_code == 200:
+                        if use_remote_json:
+                            # Handle JSON pages
+                            page = response.json()
+                            # data object
+                            data = page['d']
+                            # Grab the results
+                            results = data['results'] if 'results' in data else []
+                            # For each result
+                            for package in results:
                                 # sync it!
                                 self.sync_package(package)
-
-                        links = page.find_all('link')
-                        # Get the last link on the page
-                        link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
-                        # If the last link is the next link set it's url as the target url for the next iteration
-                        if link[KEY_REL] == VALUE_NEXT['xml']:
-                            url = str(link['href'])
-                            print(' ')
-                            cool_down_counter -= 1
-                            if cool_down_counter == 1:
-                                # Cool down for 5 seconds every 250 pages...
-                                print('Cooling down for 5 seconds...')
-                                print(' ')
-                                sleep(30)
-                                cool_down_counter = 250
+                            # If we have a next key continue to the next page
+                            if VALUE_NEXT['json'] in data:
+                                # Set the url
+                                url = data[VALUE_NEXT['json']]
+                            else:
+                                # Break out
+                                done = True
                         else:
-                            print(' ')
-                            print('Done!')
-                            # Break out
-                            done = True
+                            # Handle XML pages
+                            page = response.objectified
+                            entries = page.find_all('entry')
+                            # Whats the size of the entry list
+                            if len(entries) > 0:
+                                for package in entries:
+                                    # sync it!
+                                    self.sync_package(package)
+
+                            links = page.find_all('link')
+                            # Get the last link on the page
+                            link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
+                            # If the last link is the next link set it's url as the target url for the next iteration
+                            if link[KEY_REL] == VALUE_NEXT['xml']:
+                                url = str(link['href'])
+                                print(' ')
+                                cool_down_counter -= 1
+                                if cool_down_counter == 1:
+                                    # Cool down for 5 seconds every 250 pages...
+                                    print('Cooling down for 5 seconds...')
+                                    print(' ')
+                                    sleep(30)
+                                    cool_down_counter = 250
+                            else:
+                                print(' ')
+                                print('Done!')
+                                # Remove the lock file
+                                remove(lock_file)
+                                # Break out
+                                done = True
+                    else:
+                        print(
+                            'Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
+                                response.status_code))
+                        sleep(10)
                 else:
-                    print(
-                        'Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
-                            response.status_code))
-                    sleep(10)
-            else:
-                print('Timed out when pulling package list... sleeping for 25 then trying again.')
-                sleep(25)
+                    print('Timed out when pulling package list... sleeping for 25 then trying again.')
+                    sleep(25)
+        else:
+            print('Lock file exists, is there a sync session running?')
         return True

@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup
-from requests import get, put
+from requests import get, put, exceptions
 from subprocess import call
 import hashlib
 import base64
@@ -15,15 +15,26 @@ def _pull(url, json=False):
     :param json: 
     :return: 
     """
-    if json:
-        headers = {'Accept': 'application/json'}
-        response = get(url, headers=headers)
-    else:
-        response = get(url)
-        if response.status_code == 200:
-            response.objectified = BeautifulSoup(response.content, 'xml')
-
-    return response
+    tries = 0
+    while tries < 3:
+        if json:
+            try:
+                response = get(url, headers={'Accept': 'application/json'}, timeout=0.501)
+                return response
+            except exceptions.Timeout:
+                print('Timed out when trying to pull...')
+        else:
+            try:
+                response = get(url, timeout=0.501)
+                if response.status_code == 200:
+                    response.objectified = BeautifulSoup(response.content, 'xml')
+                    return response
+            except exceptions.Timeout:
+                print('Timed out when trying to pull...')
+        tries += 1
+        print('Sleeping for 10 then trying again...')
+        time.sleep(10)
+    return False
 
 
 def pull_package(title, version, url, json=False):

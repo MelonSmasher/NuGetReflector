@@ -359,8 +359,8 @@ class Mirror(object):
                             print(' ')
                             cool_down_counter -= 1
                             if cool_down_counter == 1:
-                                # Cool down for 30 seconds every 250 pages...
-                                print('Cooling down for 30 seconds...')
+                                # Cool down for 5 seconds every 250 pages...
+                                print('Cooling down for 5 seconds...')
                                 print(' ')
                                 sleep(30)
                                 cool_down_counter = 250

@@ -312,6 +312,7 @@ class Mirror(object):
         :return: 
         """
         done = False
+        cool_down_counter = 250
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         while not done:
@@ -356,14 +357,22 @@ class Mirror(object):
                         if link[KEY_REL] == VALUE_NEXT['xml']:
                             url = str(link['href'])
                             print(' ')
+                            cool_down_counter -= 1
+                            if cool_down_counter == 1:
+                                # Cool down for 30 seconds every 250 pages...
+                                print('Cooling down for 30 seconds...')
+                                print(' ')
+                                sleep(30)
+                                cool_down_counter = 250
                         else:
                             print(' ')
                             print('Done!')
                             # Break out
                             done = True
                 else:
-                    print('Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
-                        response.status_code))
+                    print(
+                        'Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
+                            response.status_code))
                     sleep(10)
             else:
                 print('Timed out when pulling package list... sleeping for 25 then trying again.')

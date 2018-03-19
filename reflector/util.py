@@ -23,6 +23,8 @@ def _pull(url, json=False):
                 return response
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
+            except exceptions.ConnectionError:
+                print('Timed out when trying to pull...')
         else:
             try:
                 response = get(url, timeout=5.501)
@@ -30,6 +32,8 @@ def _pull(url, json=False):
                     response.objectified = BeautifulSoup(response.content, 'xml')
                     return response
             except exceptions.Timeout:
+                print('Timed out when trying to pull...')
+            except exceptions.ConnectionError:
                 print('Timed out when trying to pull...')
         tries += 1
         print('Timed out when trying to pull.')

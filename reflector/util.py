@@ -19,13 +19,13 @@ def _pull(url, json=False):
     while tries < 3:
         if json:
             try:
-                response = get(url, headers={'Accept': 'application/json'}, timeout=1.501)
+                response = get(url, headers={'Accept': 'application/json'}, timeout=5.501)
                 return response
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
         else:
             try:
-                response = get(url, timeout=1.501)
+                response = get(url, timeout=5.501)
                 if response.status_code == 200:
                     response.objectified = BeautifulSoup(response.content, 'xml')
                     return response
@@ -34,7 +34,7 @@ def _pull(url, json=False):
         tries += 1
         print('Timed out when trying to pull.')
         print('Sleeping for 10 then trying again...')
-        time.sleep(10)
+        time.sleep(25)
     return False
 
 

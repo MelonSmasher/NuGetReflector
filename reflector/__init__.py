@@ -93,6 +93,10 @@ class Mirror(object):
         # Is the package already uploaded? Pull it from the target API
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
+        if not pull_request:
+            print('Unable to download package.')
+            return False
+
         # What did the target api return
         if pull_request.status_code == 404 or pull_request.status_code == 200 or force_dl or not isfile(save_to):
             # Download the file if we are forcing or it was not already uploaded or cached

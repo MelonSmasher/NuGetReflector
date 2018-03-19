@@ -94,7 +94,7 @@ class Mirror(object):
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
         if not pull_request:
-            print('Unable to download package.')
+            print('Unable to sync package.')
             return False
 
         # What did the target api return

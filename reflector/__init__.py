@@ -318,50 +318,54 @@ class Mirror(object):
             print('Pulling packages from: ' + url)
             # pull packages from the remote api
             response = pull_packages(url, json=use_remote_json)
-            # was the response good?
-            if response.status_code == 200:
-                if use_remote_json:
-                    # Handle JSON pages
-                    page = response.json()
-                    # data object
-                    data = page['d']
-                    # Grab the results
-                    results = data['results'] if 'results' in data else []
-                    # For each result
-                    for package in results:
-                        # sync it!
-                        self.sync_package(package)
-                    # If we have a next key continue to the next page
-                    if VALUE_NEXT['json'] in data:
-                        # Set the url
-                        url = data[VALUE_NEXT['json']]
-                    else:
-                        # Break out
-                        done = True
-                else:
-                    # Handle XML pages
-                    page = response.objectified
-                    entries = page.find_all('entry')
-                    # Whats the size of the entry list
-                    if len(entries) > 0:
-                        for package in entries:
+            if response:
+                # was the response good?
+                if response.status_code == 200:
+                    if use_remote_json:
+                        # Handle JSON pages
+                        page = response.json()
+                        # data object
+                        data = page['d']
+                        # Grab the results
+                        results = data['results'] if 'results' in data else []
+                        # For each result
+                        for package in results:
                             # sync it!
                             self.sync_package(package)
-
-                    links = page.find_all('link')
-                    # Get the last link on the page
-                    link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
-                    # If the last link is the next link set it's url as the target url for the next iteration
-                    if link[KEY_REL] == VALUE_NEXT['xml']:
-                        url = str(link['href'])
-                        print(' ')
+                        # If we have a next key continue to the next page
+                        if VALUE_NEXT['json'] in data:
+                            # Set the url
+                            url = data[VALUE_NEXT['json']]
+                        else:
+                            # Break out
+                            done = True
                     else:
-                        print(' ')
-                        print('Done!')
-                        # Break out
-                        done = True
+                        # Handle XML pages
+                        page = response.objectified
+                        entries = page.find_all('entry')
+                        # Whats the size of the entry list
+                        if len(entries) > 0:
+                            for package in entries:
+                                # sync it!
+                                self.sync_package(package)
+
+                        links = page.find_all('link')
+                        # Get the last link on the page
+                        link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
+                        # If the last link is the next link set it's url as the target url for the next iteration
+                        if link[KEY_REL] == VALUE_NEXT['xml']:
+                            url = str(link['href'])
+                            print(' ')
+                        else:
+                            print(' ')
+                            print('Done!')
+                            # Break out
+                            done = True
+                else:
+                    print('Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
+                        response.status_code))
+                    sleep(10)
             else:
-                print('Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
-                    response.status_code))
-                sleep(10)
+                print('Timed out when pulling package list... sleeping for 25 then trying again.')
+                sleep(25)
         return True

@@ -325,7 +325,7 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
-        pool = ThreadPool(4)
+        pool = ThreadPool(8)
 
         if not exists(lock_file):
             # Create the lock file
@@ -346,6 +346,8 @@ class Mirror(object):
                             results = data['results'] if 'results' in data else []
 
                             pool.map(self.sync_package, results)
+                            pool.close()
+                            pool.join()
 
                             # If we have a next key continue to the next page
                             if VALUE_NEXT['json'] in data:

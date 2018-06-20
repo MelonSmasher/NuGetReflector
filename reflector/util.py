@@ -20,7 +20,12 @@ def _pull(url, json=False):
         if json:
             try:
                 response = get(url, headers={'Accept': 'application/json'}, timeout=5.501)
-                return response
+                if response.status_code == 200:
+                    return response
+                elif response.status_code == 404:
+                    print('Received a NOT FOUND response')
+                    print(str(response.status_code) + ' / ' + response.reason)
+                    return False
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
             except exceptions.ConnectionError:
@@ -35,6 +40,10 @@ def _pull(url, json=False):
                 if response.status_code == 200:
                     response.objectified = BeautifulSoup(response.content, 'xml')
                     return response
+                elif response.status_code == 404:
+                    print('Received a NOT FOUND response')
+                    print(str(response.status_code) + ' / ' + response.reason)
+                    return False
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
             except exceptions.ConnectionError:
@@ -43,8 +52,8 @@ def _pull(url, json=False):
                 print('Ran into a general error when trying to pull...')
                 print(e.message)
                 print(e)
-        print(response.status_code)
-        print(response.json())
+        print('Received an undefined response')
+        print(str(response.status_code) + ' / ' + response.reason)
         tries += 1
         print('Sleeping for 10 then trying again...')
         time.sleep(10)

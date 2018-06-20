@@ -96,7 +96,6 @@ class Mirror(object):
 
         if not pull_request.status_code:
             print('Unable to sync package.')
-            exit(111)
             return False
 
         # What did the target api return

@@ -274,7 +274,8 @@ class Mirror(object):
                            source_hash_method=remote_hash_method)
         if not multi:
             print('Done!')
-        PBAR.update(1)
+        else:
+            PBAR.update(1)
         return sync
 
     def delta_sync(self):

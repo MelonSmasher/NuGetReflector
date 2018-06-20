@@ -5,6 +5,7 @@ from time import sleep
 from yaml import load
 from reflector.util import *
 from multiprocessing.dummy import Pool as ThreadPool
+from tqdm import tqdm
 
 KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'
@@ -12,6 +13,7 @@ KEY_SRC = 'src'
 KEY_REL = 'rel'
 KEY_HREF = 'href'
 VALUE_NEXT = {'xml': 'next', 'json': '__next'}
+PBAR = tqdm(total=len([]))
 
 
 class Config(object):
@@ -77,7 +79,8 @@ class Mirror(object):
                dl_reties=0,
                up_retries=0,
                force_dl=False,
-               force_up=False
+               force_up=False,
+               multi=False
                ):
         """
         :param content_url: 
@@ -89,14 +92,16 @@ class Mirror(object):
         :param dl_reties:
         :param up_retries:
         :param force_dl:
-        :param force_up: 
+        :param force_up:
+        :param multi:
         :return: 
         """
         # Is the package already uploaded? Pull it from the target API
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
         if not pull_request.status_code:
-            print('Unable to sync package.')
+            if not multi:
+                print('Unable to sync package.')
             return False
 
         # What did the target api return
@@ -104,7 +109,8 @@ class Mirror(object):
             # Download the file if we are forcing or it was not already uploaded or cached
             if pull_request.status_code == 404 or not isfile(save_to) or force_dl:
                 if not download_file(content_url, save_to):
-                    print('Package does not exists after download!?!')
+                    if not multi:
+                        print('Package does not exists after download!?!')
                     return False
 
             # Did we get a source hash when this was called
@@ -115,7 +121,8 @@ class Mirror(object):
                 if not hash_verified and dl_reties < 3:
                     # Count a retry
                     dl_reties += 1
-                    print('Cache hash does not match source hash... retying download...')
+                    if not multi:
+                        print('Cache hash does not match source hash... retying download...')
                     # Run another sync
                     return self.__sync(
                         content_url,
@@ -131,13 +138,16 @@ class Mirror(object):
                     )
                 elif not hash_verified and dl_reties >= 3:
                     # Reached max retries
-                    print('Retried to download the package 3 times. Skipping :( ')
+                    if not multi:
+                        print('Retried to download the package 3 times. Skipping :( ')
                     return False
             else:
-                print('Skipping cache hash verification...')
+                if not multi:
+                    print('Skipping cache hash verification...')
         else:
             # API Error
-            print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+            if not multi:
+                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
             return False
 
         # Made it here? Cache hash either verified or skipped verification
@@ -152,23 +162,26 @@ class Mirror(object):
                 )
 
                 if return_code is not 0:
-                    print('Push failed, retying with native library.')
-                    print('Uploading package...')
+                    if not multi:
+                        print('Push failed, retying with native library.')
+                        print('Uploading package...')
                     # If the dotnet binary does not return 0 try to use a python library
                     push_response = push_package_native(
                         save_to,
                         self.local_api_upload_url,
                         self.local_api_key
                     )
-                    print(''.join(['Response code: ', str(push_response.status_code)]))
-                    if push_response.status_code is not 200:
-                        print('Upload failed... :-(')
-                        print(''.join(['Response message: ', str(push_response.content)]))
+                    if not multi:
+                        print(''.join(['Response code: ', str(push_response.status_code)]))
+                        if push_response.status_code is not 200:
+                            print('Upload failed... :-(')
+                            print(''.join(['Response message: ', str(push_response.content)]))
 
         else:
             # API Error
             # This should never happen. It should get caught above
-            print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+            if not multi:
+                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
             return False
 
         # If we have a source hash Start verifying it
@@ -188,16 +201,19 @@ class Mirror(object):
 
                 # Does the source hash match the target repo hash?
                 if hashes_match(target_hash, source_hash):
-                    print('Package synced and verified!')
+                    if not multi:
+                        print('Package synced and verified!')
                     return True
                 else:
-                    print('Package synced but checksum do not match!')
+                    if not multi:
+                        print('Package synced but checksum do not match!')
                     return False
 
             elif up_retries <= 3:
                 up_retries += 1
-                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
-                print('Package not synced retrying...')
+                if not multi:
+                    print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                    print('Package not synced retrying...')
                 return self.__sync(
                     content_url,
                     save_to,
@@ -212,21 +228,25 @@ class Mirror(object):
                 )
 
             elif up_retries >= 3:
-                print('Max upload retries reached. Skipping :-( ')
-                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                if not multi:
+                    print('Max upload retries reached. Skipping :-( ')
+                    print(''.join(['API error! Code: ', str(pull_request.status_code)]))
                 return False
 
             else:
-                # API Error
-                print(''.join(['API error! Code: ', str(pull_request.status_code)]))
+                if not multi:
+                    # API Error
+                    print(''.join(['API error! Code: ', str(pull_request.status_code)]))
                 return False
         else:
-            print('Package synced!')
+            if not multi:
+                print('Package synced!')
             return True
 
-    def sync_package(self, package):
+    def sync_package(self, package, multi=False):
         """
         :param package:
+        :param multi:
         :return: 
         """
         # Extract the info that we need from the package entry
@@ -246,13 +266,15 @@ class Mirror(object):
             remote_hash_method = str(package.properties.PackageHashAlgorithm.text).lower()
 
         # Begin package sync
-        print('')
-        print(''.join(['########## ', package_n_v, ' ##########']))
+        if not multi:
+            print('')
+            print(''.join(['########## ', package_n_v, ' ##########']))
 
         sync = self.__sync(content_url, save_to, package_name, version, source_hash=remote_hash,
                            source_hash_method=remote_hash_method)
-
-        print('Done!')
+        if not multi:
+            print('Done!')
+        PBAR.update(1)
         return sync
 
     def delta_sync(self):
@@ -362,7 +384,6 @@ class Mirror(object):
                             # If the last link is the next link set it's url as the target url for the next iteration
                             if link[KEY_REL] == VALUE_NEXT['xml']:
                                 url = str(link['href'])
-                                print(' ')
                                 cool_down_counter -= 1
                                 if cool_down_counter == 1:
                                     # Cool down for 5 seconds every 250 pages...
@@ -387,8 +408,10 @@ class Mirror(object):
                     sleep(25)
 
             # Sync the packages
-            pool = ThreadPool(4)
-            pool.map(self.sync_package, packages)
+            global PBAR
+            PBAR = tqdm(total=len(packages))
+            pool = ThreadPool(8)
+            pool.map_async(self.sync_package(multi=True), packages)
             pool.close()
             pool.join()
 

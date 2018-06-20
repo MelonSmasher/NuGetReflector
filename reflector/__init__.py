@@ -361,10 +361,10 @@ class Mirror(object):
                             page = response.objectified
                             entries = page.find_all('entry')
                             # Whats the size of the entry list
-                            if len(entries) > 0:
-                                for package in entries:
-                                    # sync it!
-                                    self.sync_package(package)
+
+                            pool.map(self.sync_package, entries)
+                            pool.close()
+                            pool.join()
 
                             links = page.find_all('link')
                             # Get the last link on the page

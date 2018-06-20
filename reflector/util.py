@@ -55,7 +55,6 @@ def _pull(url, json=False):
                 print('Ran into a general error when trying to pull...')
                 print(e.message)
                 print(e)
-        print('Received an undefined response')
         if response:
             print(str(response.status_code) + ' / ' + response.reason)
         tries += 1

@@ -80,7 +80,7 @@ class Mirror(object):
                up_retries=0,
                force_dl=False,
                force_up=False,
-               multi=False
+               multi=True
                ):
         """
         :param content_url: 
@@ -320,7 +320,7 @@ class Mirror(object):
                         pull_response = pull_package(title, version, self.remote_packages_url, self.remote_json_api)
                         if pull_response.status_code == 200:
                             package = pull_response.json() if self.remote_json_api else pull_response.objectified
-                            self.sync_package(package)
+                            self.sync_package(package, False)
                         else:
                             print('Received bad http code from remote API when pulling package. Response Code: ' + str(
                                 pull_response.status_code))
@@ -412,7 +412,7 @@ class Mirror(object):
             global PBAR
             PBAR = tqdm(total=len(packages))
             pool = ThreadPool(8)
-            pool.map_async(self.sync_package(multi=True), packages)
+            pool.map_async(self.sync_package, packages)
             pool.close()
             pool.join()
 
@@ -450,7 +450,7 @@ class Mirror(object):
                             # For each result
                             for package in results:
                                 # sync it!
-                                self.sync_package(package)
+                                self.sync_package(package, False)
                             # If we have a next key continue to the next page
                             if VALUE_NEXT['json'] in data:
                                 # Set the url
@@ -466,7 +466,7 @@ class Mirror(object):
                             if len(entries) > 0:
                                 for package in entries:
                                     # sync it!
-                                    self.sync_package(package)
+                                    self.sync_package(package, False)
 
                             links = page.find_all('link')
                             # Get the last link on the page

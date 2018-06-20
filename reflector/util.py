@@ -25,6 +25,8 @@ def _pull(url, json=False):
                 elif response.status_code == 404:
                     print('Received a NOT FOUND response')
                     print(str(response.status_code) + ' / ' + response.reason)
+                    print(url)
+                    exit(100)
                     return False
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
@@ -43,6 +45,8 @@ def _pull(url, json=False):
                 elif response.status_code == 404:
                     print('Received a NOT FOUND response')
                     print(str(response.status_code) + ' / ' + response.reason)
+                    print(url)
+                    exit(100)
                     return False
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')

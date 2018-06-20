@@ -17,6 +17,7 @@ def _pull(url, json=False):
     """
     tries = 0
     while tries < 3:
+        response = False
         if json:
             try:
                 response = get(url, headers={'Accept': 'application/json'}, timeout=5.501)
@@ -55,7 +56,8 @@ def _pull(url, json=False):
                 print(e.message)
                 print(e)
         print('Received an undefined response')
-        print(str(response.status_code) + ' / ' + response.reason)
+        if response:
+            print(str(response.status_code) + ' / ' + response.reason)
         tries += 1
         print('Sleeping for 10 then trying again...')
         time.sleep(10)

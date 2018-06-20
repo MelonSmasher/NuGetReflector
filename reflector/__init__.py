@@ -96,6 +96,7 @@ class Mirror(object):
 
         if not pull_request:
             print('Unable to sync package.')
+            print(pull_request)
             exit(111)
             return False
 

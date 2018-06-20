@@ -43,6 +43,8 @@ def _pull(url, json=False):
                 print('Ran into a general error when trying to pull...')
                 print(e.message)
                 print(e)
+        print(response.status_code)
+        print(response.json())
         tries += 1
         print('Sleeping for 10 then trying again...')
         time.sleep(10)

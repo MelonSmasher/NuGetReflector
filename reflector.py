@@ -11,6 +11,8 @@ def main():
                         help='Sync the latest packages from the feed url.')
     parser.add_argument('-f', '--full', action='store_true',
                         help='Reconcile the entire local mirror against the remote repo.')
+    parser.add_argument('-x', '--multithreadsync', action='store_true',
+                        help='Reconcile the entire local mirror against the remote repo. Uses multiple threads. (beta)')
     args = parser.parse_args()
 
     config = Config()
@@ -34,6 +36,10 @@ def main():
     if args.full:
         print('Starting a full sync')
         mirror.sync_packages()
+
+    if args.multithreadsync:
+        print('Starting a full x-thread sync')
+        mirror.sync_packages_xthread()
 
 
 if __name__ == "__main__":

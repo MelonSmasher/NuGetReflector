@@ -316,6 +316,86 @@ class Mirror(object):
             print('Lock file exists, is there a sync session running?')
         return True
 
+    def sync_packages_xthread(self):
+        """
+        :return:
+        """
+        done = False
+        cool_down_counter = 250
+        url = self.remote_packages_url
+        use_remote_json = self.remote_json_api
+        lock_file = '/tmp/reflector_full.lock'
+        packages = []
+
+        if not exists(lock_file):
+            # Create the lock file
+            mknod(lock_file)
+            while not done:
+                print('Pulling packages from: ' + url)
+                response = pull_packages(url, json=use_remote_json)
+                if response:
+                    # was the response good?
+                    if response.status_code == 200:
+                        if use_remote_json:
+                            # Handle JSON pages
+                            page = response.json()
+                            # data object
+                            data = page['d']
+                            # Grab the results add append them to the packages
+                            packages = packages + (data['results'] if 'results' in data else [])
+                            # If we have a next key continue to the next page
+                            if VALUE_NEXT['json'] in data:
+                                # Set the url
+                                url = data[VALUE_NEXT['json']]
+                            else:
+                                # Break out
+                                done = True
+                        else:
+                            # Handle XML pages
+                            page = response.objectified
+                            packages = packages + page.find_all('entry')
+                            # Whats the size of the entry list
+                            # Find all links
+                            links = page.find_all('link')
+                            # Get the last link on the page
+                            link = links[0] if 0 > (len(links) - 1) else links[(len(links) - 1)]
+                            # If the last link is the next link set it's url as the target url for the next iteration
+                            if link[KEY_REL] == VALUE_NEXT['xml']:
+                                url = str(link['href'])
+                                print(' ')
+                                cool_down_counter -= 1
+                                if cool_down_counter == 1:
+                                    # Cool down for 5 seconds every 250 pages...
+                                    print('Cooling down for 5 seconds...')
+                                    print(' ')
+                                    sleep(30)
+                                    cool_down_counter = 250
+                            else:
+                                print(' ')
+                                print('Done!')
+                                # Remove the lock file
+                                remove(lock_file)
+                                # Break out
+                                done = True
+                    else:
+                        print(
+                            'Received bad http code from remote API. Sleeping for 10 and trying again. Response Code: ' + str(
+                                response.status_code))
+                        sleep(10)
+                else:
+                    print('Timed out when pulling package list... sleeping for 25 then trying again.')
+                    sleep(25)
+
+            # Sync the packages
+            pool = ThreadPool(4)
+            pool.map(self.sync_package, packages)
+            pool.close()
+            pool.join()
+
+        else:
+            print('Lock file exists, is there a sync session running?')
+            return True
+
     def sync_packages(self):
         """        
         :return: 
@@ -325,7 +405,6 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
-
 
         if not exists(lock_file):
             # Create the lock file
@@ -344,12 +423,10 @@ class Mirror(object):
                             data = page['d']
                             # Grab the results
                             results = data['results'] if 'results' in data else []
-
-                            pool = ThreadPool(4)
-                            pool.map(self.sync_package, results)
-                            pool.close()
-                            pool.join()
-
+                            # For each result
+                            for package in results:
+                                # sync it!
+                                self.sync_package(package)
                             # If we have a next key continue to the next page
                             if VALUE_NEXT['json'] in data:
                                 # Set the url
@@ -362,11 +439,10 @@ class Mirror(object):
                             page = response.objectified
                             entries = page.find_all('entry')
                             # Whats the size of the entry list
-
-                            pool = ThreadPool(4)
-                            pool.map(self.sync_package, entries)
-                            pool.close()
-                            pool.join()
+                            if len(entries) > 0:
+                                for package in entries:
+                                    # sync it!
+                                    self.sync_package(package)
 
                             links = page.find_all('link')
                             # Get the last link on the page

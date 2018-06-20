@@ -35,8 +35,11 @@ def _pull(url, json=False):
                 print('Timed out when trying to pull...')
             except exceptions.ConnectionError:
                 print('Timed out when trying to pull...')
+            except Exception as e:
+                print('Ran into a general error when trying to pull...')
+                print(e.message)
+                print(e)
         tries += 1
-        print('Timed out when trying to pull.')
         print('Sleeping for 10 then trying again...')
         time.sleep(10)
     return False

@@ -4,6 +4,7 @@ from os import mknod, remove
 from time import sleep
 from yaml import load
 from reflector.util import *
+from multiprocessing.dummy import Pool as ThreadPool
 
 KEY_TITLE = {'xml': 'title', 'json': 'Id'}
 KEY_CONTENT = 'content'
@@ -324,6 +325,7 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
+        pool = ThreadPool(4)
 
         if not exists(lock_file):
             # Create the lock file
@@ -342,10 +344,9 @@ class Mirror(object):
                             data = page['d']
                             # Grab the results
                             results = data['results'] if 'results' in data else []
-                            # For each result
-                            for package in results:
-                                # sync it!
-                                self.sync_package(package)
+
+                            pool.map(self.sync_package, results)
+
                             # If we have a next key continue to the next page
                             if VALUE_NEXT['json'] in data:
                                 # Set the url

@@ -325,7 +325,7 @@ class Mirror(object):
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
-        pool = ThreadPool(8)
+
 
         if not exists(lock_file):
             # Create the lock file
@@ -345,6 +345,7 @@ class Mirror(object):
                             # Grab the results
                             results = data['results'] if 'results' in data else []
 
+                            pool = ThreadPool(4)
                             pool.map(self.sync_package, results)
                             pool.close()
                             pool.join()
@@ -362,6 +363,7 @@ class Mirror(object):
                             entries = page.find_all('entry')
                             # Whats the size of the entry list
 
+                            pool = ThreadPool(4)
                             pool.map(self.sync_package, entries)
                             pool.close()
                             pool.join()

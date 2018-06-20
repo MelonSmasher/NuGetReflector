@@ -344,7 +344,7 @@ class Mirror(object):
         :return:
         """
         done = False
-        cool_down_counter = 250
+        cool_down_counter = 500
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
@@ -389,8 +389,7 @@ class Mirror(object):
                                 if cool_down_counter == 1:
                                     # Cool down for 5 seconds every 250 pages...
                                     print('Cooling down for 5 seconds...')
-                                    print(' ')
-                                    sleep(30)
+                                    sleep(5)
                                     cool_down_counter = 250
                             else:
                                 print(' ')

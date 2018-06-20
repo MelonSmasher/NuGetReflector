@@ -94,9 +94,8 @@ class Mirror(object):
         # Is the package already uploaded? Pull it from the target API
         pull_request = pull_package(package_name, version, self.local_packages_url, self.local_json_api)
 
-        if not pull_request:
+        if not pull_request.status_code:
             print('Unable to sync package.')
-            print(pull_request)
             exit(111)
             return False
 

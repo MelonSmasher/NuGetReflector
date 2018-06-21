@@ -24,9 +24,6 @@ def _pull(url, json=False):
                 if response.status_code == 200:
                     return response
                 elif response.status_code == 404:
-                    print('Received a NOT FOUND response')
-                    print(str(response.status_code) + ' / ' + response.reason)
-                    print(url)
                     return response
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')
@@ -43,9 +40,6 @@ def _pull(url, json=False):
                     response.objectified = BeautifulSoup(response.content, 'xml')
                     return response
                 elif response.status_code == 404:
-                    print('Received a NOT FOUND response')
-                    print(str(response.status_code) + ' / ' + response.reason)
-                    print(url)
                     return response
             except exceptions.Timeout:
                 print('Timed out when trying to pull...')

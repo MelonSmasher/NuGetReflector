@@ -243,7 +243,7 @@ class Mirror(object):
                 print('Package synced!')
             return True
 
-    def sync_package(self, package, multi=False):
+    def sync_package(self, package, multi=True):
         """
         :param package:
         :param multi:
@@ -344,7 +344,6 @@ class Mirror(object):
         :return:
         """
         done = False
-        cool_down_counter = 500
         url = self.remote_packages_url
         use_remote_json = self.remote_json_api
         lock_file = '/tmp/reflector_full.lock'
@@ -385,12 +384,6 @@ class Mirror(object):
                             # If the last link is the next link set it's url as the target url for the next iteration
                             if link[KEY_REL] == VALUE_NEXT['xml']:
                                 url = str(link['href'])
-                                cool_down_counter -= 1
-                                if cool_down_counter == 1:
-                                    # Cool down for 5 seconds every 250 pages...
-                                    print('Cooling down for 5 seconds...')
-                                    sleep(5)
-                                    cool_down_counter = 250
                             else:
                                 print(' ')
                                 print('Done!')
@@ -477,7 +470,7 @@ class Mirror(object):
                                 cool_down_counter -= 1
                                 if cool_down_counter == 1:
                                     # Cool down for 5 seconds every 250 pages...
-                                    print('Cooling down for 5 seconds...')
+                                    print('Cooling down for 30 seconds...')
                                     print(' ')
                                     sleep(30)
                                     cool_down_counter = 250

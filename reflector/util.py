@@ -110,15 +110,17 @@ def push_package_native(package_path, repo_url, api_key):
     return put(repo_url, files=files, headers=headers)
 
 
-def download_file(url, save_to):
+def download_file(url, save_to, multi=True):
     """
     :param url: 
-    :param save_to: 
+    :param save_to:
+    :param multi:
     :return: 
     """
     count = 0
-    sys.stdout.write('Downloading.')
-    sys.stdout.flush()
+    if not multi:
+        sys.stdout.write('Downloading.')
+        sys.stdout.flush()
     # Does the file already exist?
     if os.path.isfile(save_to):
         # If the file exists remove it since we forced
@@ -129,16 +131,18 @@ def download_file(url, save_to):
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:
                 # Count the chunks
-                count += 1
-                if count >= 1024:
-                    # Write a dot every 1024 chunks
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                    count = 0
+                if not multi:
+                    count += 1
+                    if count >= 1024:
+                        # Write a dot every 1024 chunks
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                        count = 0
                 # Write to the file when the chunk gets to 1024
                 f.write(chunk)
                 f.flush()
-    print(' Done!')
+    if not multi:
+        print(' Done!')
     return True if os.path.isfile(save_to) else False
 
 
@@ -187,33 +191,39 @@ def hashes_match(hash_1, hash_2):
         return False
 
 
-def verify_hash(file_path, target_hash, message='Verifying package hash.', hash_method='sha512'):
+def verify_hash(file_path, target_hash, message='Verifying package hash.', hash_method='sha512', multi=True):
     """
     :param file_path: 
     :param target_hash: 
     :param message: 
-    :param hash_method: 
+    :param hash_method:
+    :param multi:
     :return: 
     """
-    sys.stdout.write(message)
-    sys.stdout.flush()
+    if not multi:
+        sys.stdout.write(message)
+        sys.stdout.flush()
     hash_method.lower()
 
     if hash_method == 'sha512':
-        sys.stdout.write('.')
+        if not multi:
+            sys.stdout.write('.')
         local_hash = sha512sum(file_path)
         sys.stdout.write('.')
     elif hash_method == 'sha256':
+        if not multi:
+            sys.stdout.write('.')
         local_hash = sha256sum(file_path)
-        sys.stdout.write('.')
     elif hash_method == 'sha1':
-        sys.stdout.write('.')
+        if not multi:
+            sys.stdout.write('.')
         local_hash = sha1sum(file_path)
     else:
-        sys.stdout.write('.')
+        if not multi:
+            sys.stdout.write('.')
         local_hash = sha512sum(file_path)
-
-    print('. Done!')
+    if not multi:
+        print('. Done!')
     return hashes_match(local_hash, target_hash)
 
 

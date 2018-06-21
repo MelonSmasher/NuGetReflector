@@ -116,7 +116,7 @@ class Mirror(object):
             # Did we get a source hash when this was called
             if source_hash is not None and self.verify_downloads:
                 # Verify the cached package hash
-                hash_verified = verify_hash(save_to, source_hash, hash_method=source_hash_method)
+                hash_verified = verify_hash(save_to, source_hash, hash_method=source_hash_method, multi=multi)
                 # If the hash is not verified and we have retired less than 3 times
                 if not hash_verified and dl_reties < 3:
                     # Count a retry
